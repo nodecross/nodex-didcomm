@@ -1,0 +1,49 @@
+[package]
+name = "nodex-didcomm"
+version = "0.1.0"
+edition = "2018"
+readme = "README.md"
+keywords = ["iot", "embedded", "root-of-trust", "did"]
+categories = ["embedded", "cryptography"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+actix-rt = { version = "2.7.0" }
+arrayref = { version = "0.3.6" }
+chrono = { version = "0.4" }
+cuid = { version = "1.3.1" }
+data-encoding = { version = "2.3.2" }
+didcomm-rs = { git = "https://github.com/nodecross/didcomm-rs.git", tag = "v0.8.0" }
+getrandom = { version = "0.2" }
+hdwallet = { version = "0.3.1" }
+hex = { version = "0.4.3" }
+hmac = { version = "0.12.1" }
+home-config = { version = "0.6.0", features = ["json", "yaml", "toml"] }
+ibig = { version = "0.3.5" }
+libloading = { version = "0.7.4" }
+log = { version = "0.4.0" }
+k256 = { version = "0.10.4", features = [
+  "ecdh",
+  "ecdsa",
+  "sha256",
+  "keccak256",
+  "serde",
+] }
+reqwest = { version = "0.11", features = [
+  "json",
+  "rustls-tls",
+], default-features = false }
+serde = { version = "1.0.131", features = ["derive"] }
+serde_jcs = { version = "0.1.0" }
+serde_json = { version = "1.0.71" }
+shadow-rs = "0.21.0"
+sha2 = { version = "0.10.2" }
+x25519-dalek = { version = "1.2.0" }
+
+
+[build-dependencies]
+shadow-rs = "0.21.0"
+
+[dev-dependencies]
+rstest = { version = "0.17.0" }
