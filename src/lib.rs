@@ -1,11 +1,11 @@
 mod cipher;
 mod client;
 mod config;
-mod errors;
+pub mod errors;
 mod extension;
 mod keyring;
 mod runtime;
 mod schema;
-mod services;
+pub mod services;
 mod sidetree;
 mod utils;
