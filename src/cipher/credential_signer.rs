@@ -162,7 +162,7 @@ impl CredentialSigner {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::nodex::{
+    use crate::nodex_didcomm::{
         keyring::{self, secp256k1::Secp256k1Context},
         schema::general::{CredentialSubject, Issuer},
     };
