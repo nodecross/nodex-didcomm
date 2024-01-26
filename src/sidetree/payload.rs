@@ -319,7 +319,7 @@ impl OperationPayload {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::nodex_didcomm::keyring;
+    use crate::keyring;
 
     use super::*;
 

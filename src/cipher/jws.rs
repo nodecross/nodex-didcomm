@@ -134,7 +134,7 @@ impl Jws {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::nodex_didcomm::keyring::{self, secp256k1::Secp256k1Context};
+    use crate::keyring::{self, secp256k1::Secp256k1Context};
 
     use super::*;
     use rstest::*;
