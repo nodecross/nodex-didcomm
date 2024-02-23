@@ -1,18 +1,19 @@
-use crate::errors::NodeXDidCommError;
+use thiserror::Error;
 
 pub struct Random {}
 
+#[derive(Debug, Error)]
+pub enum RandomError {
+    #[error(transparent)]
+    GetRandomError(#[from] getrandom::Error),
+}
+
 impl Random {
-    pub fn bytes(size: &usize) -> Result<Vec<u8>, NodeXDidCommError> {
+    pub fn bytes(size: &usize) -> Result<Vec<u8>, RandomError> {
         let mut bytes = vec![0u8; *size];
 
-        match getrandom::getrandom(&mut bytes) {
-            Ok(_) => Ok(bytes),
-            Err(e) => {
-                log::error!("{:?}", e);
-                Err(NodeXDidCommError {})
-            }
-        }
+        getrandom::getrandom(&mut bytes)?;
+        Ok(bytes)
     }
 }
 

@@ -1,11 +1,9 @@
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::json;
+use thiserror::Error;
 
-use crate::{
-    errors::NodeXDidCommError, keyring::secp256k1::Secp256k1, schema::general::GeneralVcDataModel,
-    utils,
-};
+use crate::nodex::{keyring::secp256k1::Secp256k1, schema::general::GeneralVcDataModel, utils};
 
 use super::jws::Jws;
 
@@ -48,6 +46,20 @@ pub struct CredentialSignerSuite {
     pub context: Secp256k1,
 }
 
+#[derive(Debug, Error)]
+pub enum CredentialSignerError {
+    #[error("jws error: {0:?}")]
+    JwsError(#[from] super::jws::JwsError),
+    #[error("json parse error: {0:?}")]
+    JsonParseError(#[from] serde_json::Error),
+    #[error("did is none. please set did")]
+    DidIsNone,
+    #[error("key_id is none. please set key_id")]
+    KeyIdIsNone,
+    #[error("proof not found")]
+    ProofNotFound,
+}
+
 pub struct CredentialSigner {}
 
 impl CredentialSigner {
@@ -57,28 +69,22 @@ impl CredentialSigner {
     pub fn sign(
         object: &GeneralVcDataModel,
         suite: &CredentialSignerSuite,
-    ) -> Result<GeneralVcDataModel, NodeXDidCommError> {
+    ) -> Result<GeneralVcDataModel, CredentialSignerError> {
         // FIXME:
         // if (Object.keys(object).indexOf(this.PROOF_KEY) !== -1) {
         //     throw new Error()
         // }
 
         let created = Utc::now().to_rfc3339();
-        let jws = match Jws::encode(&json!(object), &suite.context) {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!("{:?}", e);
-                return Err(NodeXDidCommError {});
-            }
-        };
+        let jws = Jws::encode(&json!(object), &suite.context)?;
 
         let did = match &suite.did {
             Some(v) => v,
-            None => return Err(NodeXDidCommError {}),
+            None => return Err(CredentialSignerError::DidIsNone),
         };
         let key_id = match &suite.key_id {
             Some(v) => v,
-            None => return Err(NodeXDidCommError {}),
+            None => return Err(CredentialSignerError::KeyIdIsNone),
         };
 
         let proof: ProofContext = ProofContext {
@@ -99,33 +105,22 @@ impl CredentialSigner {
 
         utils::json::merge(&mut signed_object, json!(proof));
 
-        match serde_json::from_value::<GeneralVcDataModel>(signed_object) {
-            Ok(v) => Ok(v),
-            Err(e) => {
-                log::error!("{:?}", e);
-                Err(NodeXDidCommError {})
-            }
-        }
+        Ok(serde_json::from_value::<GeneralVcDataModel>(signed_object)?)
     }
 
     pub fn verify(
-        object: &GeneralVcDataModel,
+        mut object: GeneralVcDataModel,
         suite: &CredentialSignerSuite,
-    ) -> Result<(Value, bool), NodeXDidCommError> {
+    ) -> Result<(GeneralVcDataModel, bool), CredentialSignerError> {
         // FIXME:
         // if (Object.keys(object).indexOf(this.PROOF_KEY) === -1) {
         //     throw new Error()
         // }
 
-        let mut serialized = json!(&object);
-
-        let proof = match serde_json::from_value::<Proof>(serialized["proof"].take()) {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!("{:?}", e);
-                return Err(NodeXDidCommError {});
-            }
-        };
+        let proof = object
+            .proof
+            .take()
+            .ok_or(CredentialSignerError::ProofNotFound)?;
 
         // FIXME:
         // if (proof === undefined) {
@@ -139,30 +134,18 @@ impl CredentialSigner {
         // }
 
         let jws = proof.jws;
-        let payload = match serde_json::from_value::<GeneralVcDataModel>(serialized) {
-            Ok(v) => json!(v),
-            Err(e) => {
-                log::error!("{:?}", e);
-                return Err(NodeXDidCommError {});
-            }
-        };
+        let payload = serde_json::to_value(&object)?;
 
         // NOTE: verify
-        let verified = match Jws::verify(&payload, &jws, &suite.context) {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!("{:?}", e);
-                return Err(NodeXDidCommError {});
-            }
-        };
+        let verified = Jws::verify(&payload, &jws, &suite.context)?;
 
-        Ok((payload, verified))
+        Ok((object, verified))
     }
 }
 
 #[cfg(test)]
 pub mod tests {
-    use crate::{
+    use crate::nodex::{
         keyring::{self, secp256k1::Secp256k1Context},
         schema::general::{CredentialSubject, Issuer},
     };
@@ -283,19 +266,14 @@ pub mod tests {
             Err(_) => panic!(),
         };
 
-        let (result, verified) = match CredentialSigner::verify(
-            &vc,
+        let (verified_model, verified) = match CredentialSigner::verify(
+            vc,
             &CredentialSignerSuite {
                 did: None,
                 key_id: None,
                 context,
             },
         ) {
-            Ok(v) => v,
-            Err(_) => panic!(),
-        };
-
-        let verified_model = match serde_json::from_value::<GeneralVcDataModel>(result) {
             Ok(v) => v,
             Err(_) => panic!(),
         };

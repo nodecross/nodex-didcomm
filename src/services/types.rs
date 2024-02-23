@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::schema::general::GeneralVcDataModel;
+use crate::nodex::schema::general::GeneralVcDataModel;
 
 #[derive(Serialize, Deserialize)]
 pub struct VerifiedContainer {

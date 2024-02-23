@@ -1,14 +1,20 @@
 pub mod did;
 pub mod server;
 
-use std::sync::{Arc, Mutex, Once};
-
 use self::did::DidConfig;
 use self::server::ServerConfig;
+use std::sync::MutexGuard;
+use std::sync::{Arc, Mutex, Once};
 
 #[derive(Clone)]
 pub struct SingletonDidConfig {
     pub inner: Arc<Mutex<DidConfig>>,
+}
+
+impl SingletonDidConfig {
+    pub fn lock(&self) -> MutexGuard<'_, DidConfig> {
+        self.inner.lock().unwrap()
+    }
 }
 
 pub fn server_config() -> ServerConfig {
