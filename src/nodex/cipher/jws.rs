@@ -1,12 +1,12 @@
-use crate::{
-    errors::NodeXDidCommError,
+use crate::nodex::{
     keyring::secp256k1::Secp256k1,
     runtime::{self, base64_url::PaddingType},
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use thiserror::Error;
 
-use super::signer::Signer;
+use super::signer::{Signer, SignerError};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct JWSHeader {
@@ -17,51 +17,60 @@ struct JWSHeader {
 
 pub struct Jws {}
 
+#[derive(Debug, Error)]
+pub enum JwsError {
+    #[error(transparent)]
+    SignerError(#[from] SignerError),
+    #[error("InvalidJws : {0}")]
+    InvalidJws(String),
+    #[error(transparent)]
+    Base64UrlError(#[from] runtime::base64_url::Base64UrlError),
+    #[error(transparent)]
+    JsonParseError(#[from] serde_json::Error),
+    #[error("InvalidAlgorithm: {0}")]
+    InvalidAlgorithm(String),
+    #[error("b64 option is not supported")]
+    B64NotSupported,
+    #[error("b64 option is not supported, but contained")]
+    B64NotSupportedButContained,
+    #[error("EmptyPayload")]
+    EmptyPayload,
+}
+
 impl Jws {
-    pub fn encode(object: &Value, context: &Secp256k1) -> Result<String, NodeXDidCommError> {
+    pub fn encode(object: &Value, context: &Secp256k1) -> Result<String, JwsError> {
         // NOTE: header
         let header = JWSHeader {
             alg: "ES256K".to_string(),
             b64: false,
             crit: vec!["b64".to_string()],
         };
-        let _header = runtime::base64_url::Base64Url::encode(
+        let header = runtime::base64_url::Base64Url::encode(
             json!(&header).to_string().as_bytes(),
             &PaddingType::NoPadding,
         );
 
         // NOTE: payload
-        let _payload = runtime::base64_url::Base64Url::encode(
+        let payload = runtime::base64_url::Base64Url::encode(
             object.to_string().as_bytes(),
             &PaddingType::NoPadding,
         );
 
         // NOTE: message
-        let message = [_header.clone(), _payload].join(".");
+        let message = [header.clone(), payload].join(".");
 
         // NOTE: signature
-        let signature = match Signer::sign(&message, context) {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!("{:?}", e);
-                return Err(NodeXDidCommError {});
-            }
-        };
-        let _signature =
-            runtime::base64_url::Base64Url::encode(&signature, &PaddingType::NoPadding);
+        let signature = Signer::sign(&message, context)?;
+        let signature = runtime::base64_url::Base64Url::encode(&signature, &PaddingType::NoPadding);
 
-        Ok([_header, "".to_string(), _signature].join("."))
+        Ok([header, "".to_string(), signature].join("."))
     }
 
-    pub fn verify(
-        object: &Value,
-        jws: &str,
-        context: &Secp256k1,
-    ) -> Result<bool, NodeXDidCommError> {
+    pub fn verify(object: &Value, jws: &str, context: &Secp256k1) -> Result<bool, JwsError> {
         let splitted: Vec<String> = jws.to_string().split('.').map(|v| v.to_string()).collect();
 
         if splitted.len() != 3 {
-            return Err(NodeXDidCommError {});
+            return Err(JwsError::InvalidJws(jws.to_string()));
         }
 
         let _header = splitted[0].clone();
@@ -69,37 +78,23 @@ impl Jws {
         let _signature = splitted[2].clone();
 
         // NOTE: header
-        let header = match runtime::base64_url::Base64Url::decode_as_string(
-            &_header,
-            &PaddingType::NoPadding,
-        ) {
-            Ok(v) => match serde_json::from_str::<JWSHeader>(&v.as_str()) {
-                Ok(v) => v,
-                Err(e) => {
-                    log::error!("{:?}", e);
-                    return Err(NodeXDidCommError {});
-                }
-            },
-            Err(e) => {
-                log::error!("{:?}", e);
-                return Err(NodeXDidCommError {});
-            }
-        };
+        let decoded =
+            runtime::base64_url::Base64Url::decode_as_string(&_header, &PaddingType::NoPadding)?;
+        let header = serde_json::from_str::<JWSHeader>(&decoded)?;
 
         if header.alg != *"ES256K" {
-            return Err(NodeXDidCommError {});
+            return Err(JwsError::InvalidAlgorithm(header.alg));
         }
         if header.b64 {
-            return Err(NodeXDidCommError {});
+            return Err(JwsError::B64NotSupported);
         }
-        match header.crit.iter().position(|v| v == &"b64".to_string()) {
-            Some(_) => {}
-            None => return Err(NodeXDidCommError {}),
+        if header.crit.iter().all(|v| v != "b64") {
+            return Err(JwsError::B64NotSupportedButContained);
         };
 
         // NOTE: payload
         if __payload != *"".to_string() {
-            return Err(NodeXDidCommError {});
+            return Err(JwsError::EmptyPayload);
         }
         let _payload = runtime::base64_url::Base64Url::encode(
             object.to_string().as_bytes(),
@@ -110,31 +105,17 @@ impl Jws {
         let message = [_header, _payload].join(".");
 
         // NOTE: signature
-        let signature = match runtime::base64_url::Base64Url::decode_as_bytes(
-            &_signature,
-            &PaddingType::NoPadding,
-        ) {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!("{:?}", e);
-                return Err(NodeXDidCommError {});
-            }
-        };
+        let signature =
+            runtime::base64_url::Base64Url::decode_as_bytes(&_signature, &PaddingType::NoPadding)?;
 
         // NOTE: verify
-        match Signer::verify(&message, &signature, context) {
-            Ok(v) => Ok(v),
-            Err(e) => {
-                log::error!("{:?}", e);
-                Err(NodeXDidCommError {})
-            }
-        }
+        Ok(Signer::verify(&message, &signature, context)?)
     }
 }
 
 #[cfg(test)]
 pub mod tests {
-    use crate::keyring::{self, secp256k1::Secp256k1Context};
+    use crate::nodex::keyring::{self, secp256k1::Secp256k1Context};
 
     use super::*;
     use rstest::*;

@@ -1,35 +1,54 @@
 use crate::{
-    cipher::credential_signer::{CredentialSigner, CredentialSignerSuite},
-    client::nodex::NodeX,
-    errors::NodeXDidCommError,
-    keyring::{self},
-    schema::general::{CredentialSubject, GeneralVcDataModel, Issuer},
+    nodex::{
+        cipher::credential_signer::{
+            CredentialSigner, CredentialSignerError, CredentialSignerSuite,
+        },
+        keyring::{self},
+        schema::general::{CredentialSubject, GeneralVcDataModel, Issuer},
+    },
+    repository::did_repository::DidRepository,
 };
-use chrono::Utc;
-use serde_json::{json, Value};
+use anyhow::Context;
+use chrono::{DateTime, Utc};
+use serde_json::Value;
+use thiserror::Error;
 
-pub struct DIDVCService {}
+pub struct DIDVCService {
+    did_repository: Box<dyn DidRepository + Send + Sync + 'static>,
+}
 
 impl DIDVCService {
-    pub fn generate(message: &Value) -> Result<Value, NodeXDidCommError> {
-        let keyring = match keyring::keypair::KeyPairing::load_keyring() {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!("{:?}", e);
-                return Err(NodeXDidCommError {});
-            }
-        };
-        let did = match keyring.get_identifier() {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!("{:?}", e);
-                return Err(NodeXDidCommError {});
-            }
-        };
+    pub fn new<R: DidRepository + Send + Sync + 'static>(did_repository: R) -> Self {
+        Self {
+            did_repository: Box::new(did_repository),
+        }
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum DIDVCServiceError {
+    #[error("key pairing error")]
+    KeyParingError(#[from] keyring::keypair::KeyPairingError),
+    #[error("failed to get my did")]
+    MyDIDNotSet,
+    #[error("credential signer error")]
+    CredentialSignerError(#[from] CredentialSignerError),
+}
+
+impl DIDVCService {
+    pub fn generate(
+        &self,
+        message: &Value,
+        issuance_date: DateTime<Utc>,
+    ) -> Result<GeneralVcDataModel, DIDVCServiceError> {
+        let keyring = keyring::keypair::KeyPairing::load_keyring()?;
+        let did = keyring
+            .get_identifier()
+            .map_err(|_| DIDVCServiceError::MyDIDNotSet)?;
 
         let r#type = "VerifiableCredential".to_string();
         let context = "https://www.w3.org/2018/credentials/v1".to_string();
-        let issuance_date = Utc::now().to_rfc3339();
+        let issuance_date = issuance_date.to_rfc3339();
 
         let model = GeneralVcDataModel {
             id: None,
@@ -45,80 +64,47 @@ impl DIDVCService {
             proof: None,
         };
 
-        let signed = match CredentialSigner::sign(
+        let signed: GeneralVcDataModel = CredentialSigner::sign(
             &model,
             &CredentialSignerSuite {
                 did: Some(did),
                 key_id: Some("signingKey".to_string()),
                 context: keyring.get_sign_key_pair(),
             },
-        ) {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!("{:?}", e);
-                panic!()
-            }
-        };
+        )?;
 
-        Ok(json!(signed))
+        Ok(signed)
     }
 
-    pub async fn verify(message: &Value) -> Result<Value, NodeXDidCommError> {
-        let nodex_client = NodeX::new();
-
-        let model = match serde_json::from_value::<GeneralVcDataModel>(message.clone()) {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!("{:?}", e);
-                return Err(NodeXDidCommError {});
-            }
-        };
-
-        let did_document = match nodex_client.find_identifier(&model.issuer.id).await {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!("{:?}", e);
-                return Err(NodeXDidCommError {});
-            }
-        };
-        let public_keys = match did_document.did_document.public_key {
-            Some(v) => v,
-            None => return Err(NodeXDidCommError {}),
-        };
+    pub async fn verify(&self, model: GeneralVcDataModel) -> anyhow::Result<GeneralVcDataModel> {
+        let did_document = self
+            .did_repository
+            .find_identifier(&model.issuer.id)
+            .await?
+            .with_context(|| format!("did {} not found", &model.issuer.id))?;
+        let public_keys = did_document
+            .did_document
+            .public_key
+            .ok_or(anyhow::anyhow!("public_key is not found in did_document"))?;
 
         // FIXME: workaround
-        if public_keys.len() != 1 {
-            return Err(NodeXDidCommError {});
-        }
+        anyhow::ensure!(public_keys.len() == 1, "public_keys length must be 1");
 
         let public_key = public_keys[0].clone();
 
-        let context = match keyring::secp256k1::Secp256k1::from_jwk(&public_key.public_key_jwk) {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!("{:?}", e);
-                return Err(NodeXDidCommError {});
-            }
-        };
+        let context = keyring::secp256k1::Secp256k1::from_jwk(&public_key.public_key_jwk)?;
 
-        let (verified_model, verified) = match CredentialSigner::verify(
-            &model,
+        let (verified_model, verified) = CredentialSigner::verify(
+            model,
             &CredentialSignerSuite {
                 did: None,
                 key_id: None,
                 context,
             },
-        ) {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!("{:?}", e);
-                return Err(NodeXDidCommError {});
-            }
-        };
+        )
+        .context("failed to verify credential")?;
 
-        if !verified {
-            return Err(NodeXDidCommError {});
-        }
+        anyhow::ensure!(verified, "signature is not verified");
 
         Ok(verified_model)
     }

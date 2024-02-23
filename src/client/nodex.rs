@@ -1,17 +1,34 @@
+use crate::config::server_config;
 use crate::{
-    errors::NodeXDidCommError,
-    keyring,
-    sidetree::payload::{
-        CommitmentKeys, DIDCreateRequest, DIDResolutionResponse, OperationPayload,
+    nodex::{
+        keyring,
+        sidetree::payload::{
+            CommitmentKeys, DIDCreateRequest, DIDResolutionResponse, OperationPayloadBuilder,
+        },
+        utils::http_client::{HttpClient, HttpClientConfig},
     },
-    utils::http_client::{HttpClient, HttpClientConfig},
+    repository::did_repository::DidRepository,
 };
 
-// use super::encrypted::DIDCommEncryptedService;
-use crate::config::server_config;
+use reqwest::StatusCode;
+use serde::Deserialize;
+use thiserror::Error;
 
 pub struct NodeX {
     http_client: HttpClient,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SideTreeErrorBody {
+    pub code: String,
+    pub message: String,
+}
+
+#[derive(Debug, Error)]
+#[error("SideTreeError: {status_code}")]
+pub struct SideTreeError {
+    pub status_code: StatusCode,
+    pub error: SideTreeErrorBody,
 }
 
 impl NodeX {
@@ -35,129 +52,87 @@ impl NodeX {
     }
 
     // NOTE: DONE
-    pub async fn create_identifier(&self) -> Result<DIDResolutionResponse, NodeXDidCommError> {
+    pub async fn create_identifier(&self) -> anyhow::Result<DIDResolutionResponse> {
         // NOTE: find did
         if let Ok(v) = keyring::keypair::KeyPairing::load_keyring() {
             if let Ok(did) = v.get_identifier() {
-                if let Ok(json) = self.find_identifier(&did.as_str()).await {
+                if let Some(json) = self.find_identifier(&did).await? {
                     return Ok(json);
                 }
             }
         }
 
         // NOTE: does not exists did key ring
-        let mut keyring = match keyring::keypair::KeyPairing::create_keyring() {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!("{:?}", e);
-                return Err(NodeXDidCommError {});
-            }
-        };
+        let mut keyring = keyring::keypair::KeyPairing::create_keyring()?;
 
         // NOTE: create payload
-        let public = match keyring
+        let public = keyring
             .get_sign_key_pair()
-            .to_public_key("signingKey", &["auth", "general"])
-        {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!("{:?}", e);
-                return Err(NodeXDidCommError {});
-            }
-        };
-        let update = match keyring.get_recovery_key_pair().to_jwk(false) {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!("{:?}", e);
-                return Err(NodeXDidCommError {});
-            }
-        };
-        let recovery = match keyring.get_update_key_pair().to_jwk(false) {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!("{:?}", e);
-                return Err(NodeXDidCommError {});
-            }
-        };
-
-        let payload = match OperationPayload::did_create_payload(&DIDCreateRequest {
+            .to_public_key("signingKey", &["auth", "general"])?;
+        let update = keyring.get_recovery_key_pair().to_jwk(false)?;
+        let recovery = keyring.get_update_key_pair().to_jwk(false)?;
+        let payload = OperationPayloadBuilder::did_create_payload(&DIDCreateRequest {
             public_keys: vec![public],
             commitment_keys: CommitmentKeys { recovery, update },
             service_endpoints: vec![],
-        }) {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!("{:?}", e);
-                return Err(NodeXDidCommError {});
+        })?;
+
+        let res = self
+            .http_client
+            .post("/api/v1/operations", &payload)
+            .await?;
+
+        if res.status().is_success() {
+            let json = res.json::<DIDResolutionResponse>().await?;
+
+            // NOTE: save context
+            keyring.save(&json.did_document.id);
+
+            Ok(json)
+        } else {
+            let status = res.status();
+            let error = res.json::<SideTreeErrorBody>().await?;
+            Err(SideTreeError {
+                status_code: status,
+                error,
             }
-        };
-
-        let res = match self.http_client.post("/api/v1/operations", &payload).await {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!("{:?}", e);
-                return Err(NodeXDidCommError {});
-            }
-        };
-
-        let json = match res.json::<DIDResolutionResponse>().await {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!("{:?}", e);
-                return Err(NodeXDidCommError {});
-            }
-        };
-
-        // NOTE: save context
-        keyring.save(&json.did_document.id);
-
-        Ok(json)
+            .into())
+        }
     }
 
     // NOTE: DONE
     pub async fn find_identifier(
         &self,
         did: &str,
-    ) -> Result<DIDResolutionResponse, NodeXDidCommError> {
-        let res = match self
+    ) -> anyhow::Result<Option<DIDResolutionResponse>> {
+        let res = self
             .http_client
             .get(&(format!("/api/v1/identifiers/{}", &did)))
-            .await
-        {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!("{:?}", e);
-                return Err(NodeXDidCommError {});
-            }
-        };
+            .await?;
 
-        match res.json::<DIDResolutionResponse>().await {
-            Ok(v) => Ok(v),
-            Err(e) => {
-                log::error!("{:?}", e);
-                Err(NodeXDidCommError {})
+        match res.status() {
+            StatusCode::OK => Ok(Some(res.json::<DIDResolutionResponse>().await?)),
+            StatusCode::NOT_FOUND => Ok(None),
+            other => {
+                let error = res.json::<SideTreeErrorBody>().await?;
+                Err(SideTreeError {
+                    status_code: other,
+                    error,
+                }
+                .into())
             }
         }
     }
+}
 
-    // #[allow(dead_code)]
-    // pub async fn transfer(
-    //     &self,
-    //     to_did: &str,
-    //     messages: &Vec<Value>,
-    //     metadata: &Value,
-    // ) -> Result<Value, NodeXDidCommError> {
-    //     // NOTE: didcomm (enc)
-    //     let container =
-    //         match DIDCommEncryptedService::generate(to_did, &json!(messages), Some(metadata)).await
-    //         {
-    //             Ok(v) => v,
-    //             Err(e) => {
-    //                 log::error!("{:?}", e);
-    //                 return Err(NodeXDidCommError {});
-    //             }
-    //         };
+// TODO: use other impl
+#[async_trait::async_trait]
+impl DidRepository for NodeX {
+    async fn create_identifier(&self) -> anyhow::Result<DIDResolutionResponse> {
+        NodeX::create_identifier(self).await
+    }
 
-    //     Ok(container)
-    // }
+    async fn find_identifier(&self, did: &str) -> anyhow::Result<Option<DIDResolutionResponse>> {
+        NodeX::find_identifier(self, did).await
+    }
 }

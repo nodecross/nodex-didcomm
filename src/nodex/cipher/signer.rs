@@ -1,43 +1,38 @@
-use crate::{errors::NodeXDidCommError, keyring::secp256k1::Secp256k1, runtime};
+use crate::nodex::{keyring::secp256k1::Secp256k1, runtime};
+use thiserror::Error;
 
 pub struct Signer {}
 
+#[derive(Debug, Error)]
+pub enum SignerError {
+    #[error(transparent)]
+    Secp256k1Error(#[from] runtime::secp256k1::Secp256k1Error),
+}
+
 impl Signer {
-    pub fn sign(message: &str, context: &Secp256k1) -> Result<Vec<u8>, NodeXDidCommError> {
-        match runtime::secp256k1::Secp256k1::ecdsa_sign(
+    pub fn sign(message: &str, context: &Secp256k1) -> Result<Vec<u8>, SignerError> {
+        Ok(runtime::secp256k1::Secp256k1::ecdsa_sign(
             message.as_bytes(),
             &context.get_secret_key(),
-        ) {
-            Ok(v) => Ok(v),
-            Err(e) => {
-                log::error!("{:?}", e);
-                Err(NodeXDidCommError {})
-            }
-        }
+        )?)
     }
 
     pub fn verify(
         message: &str,
         signature: &[u8],
         context: &Secp256k1,
-    ) -> Result<bool, NodeXDidCommError> {
-        match runtime::secp256k1::Secp256k1::ecdsa_verify(
+    ) -> Result<bool, SignerError> {
+        Ok(runtime::secp256k1::Secp256k1::ecdsa_verify(
             signature,
             message.as_bytes(),
             &context.get_public_key(),
-        ) {
-            Ok(v) => Ok(v),
-            Err(e) => {
-                log::error!("{:?}", e);
-                Err(NodeXDidCommError {})
-            }
-        }
+        )?)
     }
 }
 
 #[cfg(test)]
 pub mod tests {
-    use crate::keyring::{self, secp256k1::Secp256k1Context};
+    use crate::nodex::keyring::{self, secp256k1::Secp256k1Context};
 
     use super::*;
     use rstest::*;

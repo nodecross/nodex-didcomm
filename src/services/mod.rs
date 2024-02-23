@@ -1,6 +1,5 @@
 pub mod did_vc;
 pub mod encrypted;
-pub mod plaintext;
 pub mod types;
 
 use crate::config::server_config;

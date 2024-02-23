@@ -1,12 +1,13 @@
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use thiserror::Error;
 
-use crate::runtime::base64_url::Base64Url;
-use crate::runtime::base64_url::PaddingType;
-use crate::runtime::multihash::Multihash;
-use crate::{errors::NodeXDidCommError, keyring::secp256k1::KeyPairSecp256K1};
+use crate::nodex::keyring::secp256k1::KeyPairSecp256K1;
+use crate::nodex::runtime::base64_url::Base64Url;
+use crate::nodex::runtime::base64_url::PaddingType;
+use crate::nodex::runtime::multihash::Multihash;
 
-pub struct OperationPayload {}
+pub struct OperationPayloadBuilder {}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ServiceEndpoint {
@@ -254,29 +255,23 @@ struct DIDDeactivateResponse {
     // NOT IMPLEMENTED
 }
 
-impl OperationPayload {
-    pub fn did_create_payload(params: &DIDCreateRequest) -> Result<String, NodeXDidCommError> {
+#[derive(Debug, Error)]
+pub enum OperationPayloadBuilderError {
+    #[error(transparent)]
+    MultihashError(#[from] crate::nodex::runtime::multihash::MultihashError),
+}
+
+impl OperationPayloadBuilder {
+    pub fn did_create_payload(
+        params: &DIDCreateRequest,
+    ) -> Result<String, OperationPayloadBuilderError> {
         let update = json!(&params.commitment_keys.update);
-        let update_commitment = match Multihash::canonicalize_then_double_hash_then_encode(
-            update.to_string().as_bytes(),
-        ) {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!("{:?}", e);
-                return Err(NodeXDidCommError {});
-            }
-        };
+        let update_commitment =
+            Multihash::canonicalize_then_double_hash_then_encode(update.to_string().as_bytes())?;
 
         let recovery = json!(&params.commitment_keys.recovery);
-        let recovery_commitment = match Multihash::canonicalize_then_double_hash_then_encode(
-            recovery.to_string().as_bytes(),
-        ) {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!("{:?}", e);
-                return Err(NodeXDidCommError {});
-            }
-        };
+        let recovery_commitment =
+            Multihash::canonicalize_then_double_hash_then_encode(recovery.to_string().as_bytes())?;
 
         let document: DIDReplacePayload = DIDReplacePayload {
             public_keys: params.public_keys.clone(),
@@ -319,7 +314,7 @@ impl OperationPayload {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::keyring;
+    use crate::nodex::keyring;
 
     use super::*;
 
@@ -343,7 +338,7 @@ pub mod tests {
             Err(_) => panic!(),
         };
 
-        let result = match OperationPayload::did_create_payload(&DIDCreateRequest {
+        let result = match OperationPayloadBuilder::did_create_payload(&DIDCreateRequest {
             public_keys: vec![public],
             commitment_keys: CommitmentKeys { recovery, update },
             service_endpoints: vec![],
