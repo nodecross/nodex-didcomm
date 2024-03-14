@@ -1,5 +1,5 @@
-mod client;
+pub mod client;
 mod config;
-pub mod nodex;
+mod nodex;
 mod repository;
 pub mod services;
