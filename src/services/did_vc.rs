@@ -39,7 +39,7 @@ impl DIDVCService {
     pub fn generate(
         &self,
         message: &Value,
-        issuance_date: DateTime<Utc>,
+        issuance_date: Option<DateTime<Utc>>,
     ) -> Result<GeneralVcDataModel, DIDVCServiceError> {
         let keyring = keyring::keypair::KeyPairing::load_keyring()?;
         let did = keyring
@@ -48,7 +48,10 @@ impl DIDVCService {
 
         let r#type = "VerifiableCredential".to_string();
         let context = "https://www.w3.org/2018/credentials/v1".to_string();
-        let issuance_date = issuance_date.to_rfc3339();
+        let issuance_date = match issuance_date {
+            Some(issuance_date) => issuance_date.to_rfc3339(),
+            None => "".to_string()
+        };
 
         let model = GeneralVcDataModel {
             id: None,

@@ -65,7 +65,7 @@ impl DIDCommEncryptedService {
         to_did: &str,
         message: &Value,
         metadata: Option<&Value>,
-        issuance_date: DateTime<Utc>,
+        issuance_date: Option<DateTime<Utc>>,
     ) -> Result<Value, DIDCommEncryptedServiceError> {
         // NOTE: recipient from
         let my_keyring = keyring::keypair::KeyPairing::load_keyring()?;
