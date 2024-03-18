@@ -16,7 +16,7 @@ disallowed-macros = [
     'std::eprint',
     'std::eprintln',
     'std::print',
-    'std::println',
+    # 'std::println',
 ]
 
 # https://rust-lang.github.io/rust-clippy/master/index.html#disallowed_names

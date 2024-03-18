@@ -18,18 +18,12 @@ impl HttpClient {
         let url = Url::parse(&_config.base_url.to_string())?;
         let client: reqwest::Client = reqwest::Client::new();
 
-        Ok(HttpClient {
-            instance: client,
-            base_url: url,
-        })
+        Ok(HttpClient { instance: client, base_url: url })
     }
 
     fn default_headers(&self) -> HeaderMap {
         let mut headers = HeaderMap::new();
-        headers.insert(
-            reqwest::header::CONTENT_TYPE,
-            HeaderValue::from_static("application/json"),
-        );
+        headers.insert(reqwest::header::CONTENT_TYPE, HeaderValue::from_static("application/json"));
         headers
     }
 
@@ -102,9 +96,8 @@ pub mod tests {
     #[actix_rt::test]
     #[ignore]
     async fn it_should_success_get() {
-        let client_config: HttpClientConfig = HttpClientConfig {
-            base_url: "https://httpbin.org".to_string(),
-        };
+        let client_config: HttpClientConfig =
+            HttpClientConfig { base_url: "https://httpbin.org".to_string() };
 
         let client = match HttpClient::new(&client_config) {
             Ok(v) => v,
@@ -127,9 +120,8 @@ pub mod tests {
     #[actix_rt::test]
     #[ignore]
     async fn it_should_success_post() {
-        let client_config: HttpClientConfig = HttpClientConfig {
-            base_url: "https://httpbin.org".to_string(),
-        };
+        let client_config: HttpClientConfig =
+            HttpClientConfig { base_url: "https://httpbin.org".to_string() };
 
         let client = match HttpClient::new(&client_config) {
             Ok(v) => v,
@@ -152,9 +144,8 @@ pub mod tests {
     #[actix_rt::test]
     #[ignore]
     async fn it_should_success_put() {
-        let client_config: HttpClientConfig = HttpClientConfig {
-            base_url: "https://httpbin.org".to_string(),
-        };
+        let client_config: HttpClientConfig =
+            HttpClientConfig { base_url: "https://httpbin.org".to_string() };
 
         let client = match HttpClient::new(&client_config) {
             Ok(v) => v,
@@ -177,9 +168,8 @@ pub mod tests {
     #[actix_rt::test]
     #[ignore]
     async fn it_should_success_delete() {
-        let client_config: HttpClientConfig = HttpClientConfig {
-            base_url: "https://httpbin.org".to_string(),
-        };
+        let client_config: HttpClientConfig =
+            HttpClientConfig { base_url: "https://httpbin.org".to_string() };
 
         let client = match HttpClient::new(&client_config) {
             Ok(v) => v,

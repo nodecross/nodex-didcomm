@@ -54,10 +54,7 @@ impl DIDCommEncryptedService {
         did_repository: R,
         vc_service: DIDVCService,
     ) -> DIDCommEncryptedService {
-        DIDCommEncryptedService {
-            did_repository: Box::new(did_repository),
-            vc_service,
-        }
+        DIDCommEncryptedService { did_repository: Box::new(did_repository), vc_service }
     }
 
     pub async fn generate(
@@ -72,9 +69,11 @@ impl DIDCommEncryptedService {
         let my_did = my_keyring.get_identifier()?;
 
         // NOTE: recipient to
-        let did_document = self.did_repository.find_identifier(to_did).await?.ok_or(
-            DIDCommEncryptedServiceError::DIDNotFound(to_did.to_string()),
-        )?;
+        let did_document = self
+            .did_repository
+            .find_identifier(to_did)
+            .await?
+            .ok_or(DIDCommEncryptedServiceError::DIDNotFound(to_did.to_string()))?;
 
         let public_keys = did_document
             .did_document
@@ -103,11 +102,10 @@ impl DIDCommEncryptedService {
         let body = self.vc_service.generate(message, issuance_date)?;
         let body = serde_json::to_string(&body).context("failed to serialize")?;
 
-        let mut message = Message::new()
-            .from(&my_did)
-            .to(&[to_did])
-            .body(&body)
-            .map_err(|e| anyhow::anyhow!("Failed to initialize message with error = {:?}", e))?;
+        let mut message =
+            Message::new().from(&my_did).to(&[to_did]).body(&body).map_err(|e| {
+                anyhow::anyhow!("Failed to initialize message with error = {:?}", e)
+            })?;
 
         // NOTE: Has attachment
         if let Some(value) = metadata {
@@ -119,10 +117,7 @@ impl DIDCommEncryptedService {
                 .with_json(&value.to_string());
 
             message.append_attachment(
-                AttachmentBuilder::new(true)
-                    .with_id(&id)
-                    .with_format("metadata")
-                    .with_data(data),
+                AttachmentBuilder::new(true).with_id(&id).with_format("metadata").with_data(data),
             )
         }
 
@@ -169,15 +164,10 @@ impl DIDCommEncryptedService {
             .did_repository
             .find_identifier(other_did)
             .await?
-            .ok_or(DIDCommEncryptedServiceError::DIDNotFound(
-                other_did.to_string(),
-            ))?;
+            .ok_or(DIDCommEncryptedServiceError::DIDNotFound(other_did.to_string()))?;
 
         let public_keys = did_document.did_document.public_key.with_context(|| {
-            format!(
-                "public_key is not found in did_document. did = {}",
-                other_did
-            )
+            format!("public_key is not found in did_document. did = {}", other_did)
         })?;
 
         // FIXME: workaround
@@ -206,12 +196,10 @@ impl DIDCommEncryptedService {
         )
         .map_err(|e| anyhow::anyhow!("failed to decrypt message : {:?}", e))?;
 
-        let metadata = message
-            .attachment_iter()
-            .find(|item| match item.format.clone() {
-                Some(value) => value == "metadata",
-                None => false,
-            });
+        let metadata = message.attachment_iter().find(|item| match item.format.clone() {
+            Some(value) => value == "metadata",
+            None => false,
+        });
 
         let body = message
             .clone()
@@ -222,22 +210,13 @@ impl DIDCommEncryptedService {
 
         match metadata {
             Some(metadata) => {
-                let metadata = metadata
-                    .data
-                    .json
-                    .as_ref()
-                    .ok_or(anyhow::anyhow!("metadata not found"))?;
+                let metadata =
+                    metadata.data.json.as_ref().ok_or(anyhow::anyhow!("metadata not found"))?;
                 let metadata = serde_json::from_str::<Value>(metadata)
                     .context("failed to parse metadata to json")?;
-                Ok(VerifiedContainer {
-                    message: body,
-                    metadata: Some(metadata),
-                })
+                Ok(VerifiedContainer { message: body, metadata: Some(metadata) })
             }
-            None => Ok(VerifiedContainer {
-                message: body,
-                metadata: None,
-            }),
+            None => Ok(VerifiedContainer { message: body, metadata: None }),
         }
     }
 }

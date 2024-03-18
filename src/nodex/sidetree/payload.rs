@@ -277,25 +277,15 @@ impl OperationPayloadBuilder {
             public_keys: params.public_keys.clone(),
             service_endpoints: params.service_endpoints.clone(),
         };
-        let patch: DIDReplaceAction = DIDReplaceAction {
-            action: "replace".to_string(),
-            document,
-        };
+        let patch: DIDReplaceAction = DIDReplaceAction { action: "replace".to_string(), document };
 
-        let delta = json!(DIDReplaceDeltaObject {
-            patches: vec![patch],
-            update_commitment,
-        })
-        .to_string();
+        let delta =
+            json!(DIDReplaceDeltaObject { patches: vec![patch], update_commitment }).to_string();
 
         let delta_bytes = delta.as_bytes();
         let delta_hash = Base64Url::encode(&Multihash::hash(delta_bytes), &PaddingType::NoPadding);
 
-        let suffix = json!(DIDReplaceSuffixObject {
-            delta_hash,
-            recovery_commitment,
-        })
-        .to_string();
+        let suffix = json!(DIDReplaceSuffixObject { delta_hash, recovery_commitment }).to_string();
 
         let suffix_bytes = suffix.as_bytes();
 

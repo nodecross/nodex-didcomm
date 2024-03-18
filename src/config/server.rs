@@ -19,10 +19,7 @@ impl ServerConfig {
         let link =
             env::var("NODEX_DID_ATTACHMENT_LINK").unwrap_or("https://did.getnodex.io".to_string());
 
-        ServerConfig {
-            did_http_endpoint: did_endpoint,
-            did_attachment_link: link,
-        }
+        ServerConfig { did_http_endpoint: did_endpoint, did_attachment_link: link }
     }
     pub fn did_http_endpoint(&self) -> String {
         self.did_http_endpoint.clone()

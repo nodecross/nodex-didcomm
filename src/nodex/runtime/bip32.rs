@@ -22,9 +22,7 @@ impl BIP32 {
         let chain = DefaultKeyChain::new(master);
         let path = ChainPath::new(derivation_path);
 
-        let (private_key, _) = chain
-            .derive_private_key(path)
-            .map_err(BIP32Error::Hdwallet)?;
+        let (private_key, _) = chain.derive_private_key(path).map_err(BIP32Error::Hdwallet)?;
 
         let public_key = ExtendedPubKey::from_private_key(&private_key);
 

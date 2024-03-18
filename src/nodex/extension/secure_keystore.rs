@@ -215,10 +215,7 @@ impl SecureKeyStore {
             if let Some(exit_status) = NonZeroU32::new(result) {
                 Err(SecureKeyStoreError::ExternalFunctionFailed(exit_status))
             } else {
-                Ok(Some(KeyPair {
-                    public_key,
-                    secret_key,
-                }))
+                Ok(Some(KeyPair { public_key, secret_key }))
             }
         }
     }

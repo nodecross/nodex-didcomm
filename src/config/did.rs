@@ -63,10 +63,7 @@ impl KeyPairConfig {
         let pk = hex::decode(&self.public_key)?;
         let sk = hex::decode(&self.secret_key)?;
 
-        Ok(KeyPair {
-            public_key: pk,
-            secret_key: sk,
-        })
+        Ok(KeyPair { public_key: pk, secret_key: sk })
     }
 }
 
@@ -92,17 +89,8 @@ impl Default for ConfigRoot {
     fn default() -> Self {
         ConfigRoot {
             did: None,
-            key_pairs: KeyPairsConfig {
-                sign: None,
-                update: None,
-                recover: None,
-                encrypt: None,
-            },
-            extensions: ExtensionsConfig {
-                trng: None,
-                secure_keystore: None,
-                cipher: None,
-            },
+            key_pairs: KeyPairsConfig { sign: None, update: None, recover: None, encrypt: None },
+            extensions: ExtensionsConfig { trng: None, secure_keystore: None, cipher: None },
             is_initialized: false,
             schema_version: 1,
         }
@@ -167,9 +155,7 @@ impl DidConfig {
     }
 
     pub fn write(&self) -> Result<(), DidConfigError> {
-        self.config
-            .save_json(&self.root)
-            .map_err(DidConfigError::WriteError)
+        self.config.save_json(&self.root).map_err(DidConfigError::WriteError)
     }
 
     fn decode(&self, value: &Option<String>) -> Option<Vec<u8>> {
@@ -284,10 +270,7 @@ impl DidConfig {
                     None => return None,
                 };
 
-                Some(KeyPair {
-                    public_key: pk,
-                    secret_key: sk,
-                })
+                Some(KeyPair { public_key: pk, secret_key: sk })
             }
             None => None,
         }
@@ -311,10 +294,7 @@ impl DidConfig {
                     None => return None,
                 };
 
-                Some(KeyPair {
-                    public_key: pk,
-                    secret_key: sk,
-                })
+                Some(KeyPair { public_key: pk, secret_key: sk })
             }
             None => None,
         }

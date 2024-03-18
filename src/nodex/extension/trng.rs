@@ -50,9 +50,7 @@ impl Trng {
                 return Err(TrngError::ExternalFunctionFailed(exit_status));
             }
 
-            Ok(CStr::from_ptr(buffer_ptr as *const core::ffi::c_char)
-                .to_bytes()
-                .to_vec())
+            Ok(CStr::from_ptr(buffer_ptr as *const core::ffi::c_char).to_bytes().to_vec())
         }
     }
 

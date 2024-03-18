@@ -40,11 +40,8 @@ pub enum JwsError {
 impl Jws {
     pub fn encode(object: &Value, context: &Secp256k1) -> Result<String, JwsError> {
         // NOTE: header
-        let header = JWSHeader {
-            alg: "ES256K".to_string(),
-            b64: false,
-            crit: vec!["b64".to_string()],
-        };
+        let header =
+            JWSHeader { alg: "ES256K".to_string(), b64: false, crit: vec!["b64".to_string()] };
         let header = runtime::base64_url::Base64Url::encode(
             json!(&header).to_string().as_bytes(),
             &PaddingType::NoPadding,

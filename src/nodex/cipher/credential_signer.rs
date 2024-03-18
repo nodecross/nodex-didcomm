@@ -117,10 +117,7 @@ impl CredentialSigner {
         //     throw new Error()
         // }
 
-        let proof = object
-            .proof
-            .take()
-            .ok_or(CredentialSignerError::ProofNotFound)?;
+        let proof = object.proof.take().ok_or(CredentialSignerError::ProofNotFound)?;
 
         // FIXME:
         // if (proof === undefined) {
@@ -189,9 +186,7 @@ pub mod tests {
         let model = GeneralVcDataModel {
             id: None,
             r#type: vec!["type".to_string()],
-            issuer: Issuer {
-                id: "issuer".to_string(),
-            },
+            issuer: Issuer { id: "issuer".to_string() },
             context: vec!["context".to_string()],
             issuance_date: "issuance_date".to_string(),
             credential_subject: CredentialSubject {
@@ -241,9 +236,7 @@ pub mod tests {
         let model = GeneralVcDataModel {
             id: None,
             r#type: vec!["type".to_string()],
-            issuer: Issuer {
-                id: "issuer".to_string(),
-            },
+            issuer: Issuer { id: "issuer".to_string() },
             context: vec!["context".to_string()],
             issuance_date: "issuance_date".to_string(),
             credential_subject: CredentialSubject {
@@ -268,11 +261,7 @@ pub mod tests {
 
         let (verified_model, verified) = match CredentialSigner::verify(
             vc,
-            &CredentialSignerSuite {
-                did: None,
-                key_id: None,
-                context,
-            },
+            &CredentialSignerSuite { did: None, key_id: None, context },
         ) {
             Ok(v) => v,
             Err(_) => panic!(),

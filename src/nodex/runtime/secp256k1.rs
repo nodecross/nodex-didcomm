@@ -27,9 +27,7 @@ impl Secp256k1 {
         let sk = SecretKey::from_be_bytes(private_key)?;
         let pk = PublicKey::from_sec1_bytes(public_key)?;
 
-        Ok(diffie_hellman(sk.to_nonzero_scalar(), pk.as_affine())
-            .as_bytes()
-            .to_vec())
+        Ok(diffie_hellman(sk.to_nonzero_scalar(), pk.as_affine()).as_bytes().to_vec())
     }
 
     #[allow(dead_code)]
