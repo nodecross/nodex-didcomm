@@ -67,15 +67,15 @@ impl Jws {
     }
 
     pub fn verify(object: &Value, jws: &str, context: &Secp256k1) -> Result<bool, JwsError> {
-        let splitted: Vec<String> = jws.to_string().split('.').map(|v| v.to_string()).collect();
+        let split: Vec<String> = jws.split('.').map(|v| v.to_string()).collect();
 
-        if splitted.len() != 3 {
+        if split.len() != 3 {
             return Err(JwsError::InvalidJws(jws.to_string()));
         }
 
-        let _header = splitted[0].clone();
-        let __payload = splitted[1].clone();
-        let _signature = splitted[2].clone();
+        let _header = split[0].clone();
+        let __payload = split[1].clone();
+        let _signature = split[2].clone();
 
         // NOTE: header
         let decoded =
