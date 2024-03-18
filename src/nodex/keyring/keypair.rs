@@ -1,10 +1,6 @@
 use super::secp256k1::{Secp256k1, Secp256k1Context, Secp256k1Error};
 use crate::{
-    config::{
-        did_config,
-        SingletonDidConfig,
-        did::KeyPair
-    },
+    config::{did::KeyPair, did_config, SingletonDidConfig},
     nodex::{
         extension::secure_keystore::{SecureKeyStore, SecureKeyStoreType},
         extension::{secure_keystore::SecureKeyStoreError, trng::Trng},

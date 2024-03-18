@@ -1,5 +1,5 @@
 use crate::{
-    config::{did_config, did::Extension},
+    config::{did::Extension, did_config},
     nodex::runtime::random::{Random, RandomError},
 };
 use std::{ffi::CStr, num::NonZeroU32};

@@ -1,11 +1,11 @@
 use home_config::HomeConfig;
 use serde::{Deserialize, Serialize};
+use std::error::Error;
 use std::fs;
 use std::fs::OpenOptions;
 use std::io;
 use std::io::Write;
 use std::path::Path;
-use std::error::Error;
 use thiserror::Error;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

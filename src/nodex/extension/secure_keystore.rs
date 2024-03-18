@@ -2,8 +2,8 @@ use std::{ffi::CStr, num::NonZeroU32};
 use thiserror::Error;
 
 use crate::{
-    config::did_config,
     config::did::{Extension, KeyPair},
+    config::did_config,
 };
 
 #[repr(C)]
