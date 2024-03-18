@@ -12,10 +12,10 @@ type-complexity-threshold = 350
 # https://rust-lang.github.io/rust-clippy/master/index.html#disallowed_methods
 disallowed-macros = [
     'dbg',
-    'std::unimplemented',
     'std::eprint',
     'std::eprintln',
     'std::print',
+    'std::unimplemented',
     # 'std::println',
 ]
 
