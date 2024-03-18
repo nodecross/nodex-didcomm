@@ -44,7 +44,7 @@ jobs:
         run: taplo validate --colors never --no-schema
 
   test:
-    name: test
+    name: Test
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
