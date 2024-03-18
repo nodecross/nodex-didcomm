@@ -27,9 +27,7 @@ pub fn did_config() -> Box<SingletonDidConfig> {
 
     unsafe {
         ONCE.call_once(|| {
-            let singleton = SingletonDidConfig {
-                inner: Arc::new(Mutex::new(DidConfig::new())),
-            };
+            let singleton = SingletonDidConfig { inner: Arc::new(Mutex::new(DidConfig::new())) };
 
             SINGLETON = Some(Box::new(singleton))
         });

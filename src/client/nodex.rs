@@ -31,12 +31,17 @@ pub struct SideTreeError {
     pub error: SideTreeErrorBody,
 }
 
+impl Default for NodeX {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NodeX {
     pub fn new() -> Self {
         let server_config = server_config();
-        let client_config: HttpClientConfig = HttpClientConfig {
-            base_url: server_config.did_http_endpoint(),
-        };
+        let client_config: HttpClientConfig =
+            HttpClientConfig { base_url: server_config.did_http_endpoint() };
 
         let client = match HttpClient::new(&client_config) {
             Ok(v) => v,
@@ -46,9 +51,7 @@ impl NodeX {
             }
         };
 
-        NodeX {
-            http_client: client,
-        }
+        NodeX { http_client: client }
     }
 
     // NOTE: DONE
@@ -66,9 +69,8 @@ impl NodeX {
         let mut keyring = keyring::keypair::KeyPairing::create_keyring()?;
 
         // NOTE: create payload
-        let public = keyring
-            .get_sign_key_pair()
-            .to_public_key("signingKey", &["auth", "general"])?;
+        let public =
+            keyring.get_sign_key_pair().to_public_key("signingKey", &["auth", "general"])?;
         let update = keyring.get_recovery_key_pair().to_jwk(false)?;
         let recovery = keyring.get_update_key_pair().to_jwk(false)?;
         let payload = OperationPayloadBuilder::did_create_payload(&DIDCreateRequest {
@@ -77,10 +79,7 @@ impl NodeX {
             service_endpoints: vec![],
         })?;
 
-        let res = self
-            .http_client
-            .post("/api/v1/operations", &payload)
-            .await?;
+        let res = self.http_client.post("/api/v1/operations", &payload).await?;
 
         if res.status().is_success() {
             let json = res.json::<DIDResolutionResponse>().await?;
@@ -92,11 +91,7 @@ impl NodeX {
         } else {
             let status = res.status();
             let error = res.json::<SideTreeErrorBody>().await?;
-            Err(SideTreeError {
-                status_code: status,
-                error,
-            }
-            .into())
+            Err(SideTreeError { status_code: status, error }.into())
         }
     }
 
@@ -105,21 +100,14 @@ impl NodeX {
         &self,
         did: &str,
     ) -> anyhow::Result<Option<DIDResolutionResponse>> {
-        let res = self
-            .http_client
-            .get(&(format!("/api/v1/identifiers/{}", &did)))
-            .await?;
+        let res = self.http_client.get(&(format!("/api/v1/identifiers/{}", &did))).await?;
 
         match res.status() {
             StatusCode::OK => Ok(Some(res.json::<DIDResolutionResponse>().await?)),
             StatusCode::NOT_FOUND => Ok(None),
             other => {
                 let error = res.json::<SideTreeErrorBody>().await?;
-                Err(SideTreeError {
-                    status_code: other,
-                    error,
-                }
-                .into())
+                Err(SideTreeError { status_code: other, error }.into())
             }
         }
     }

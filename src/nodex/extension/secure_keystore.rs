@@ -2,8 +2,8 @@ use std::{ffi::CStr, num::NonZeroU32};
 use thiserror::Error;
 
 use crate::{
-    config::did_config,
     config::did::{Extension, KeyPair},
+    config::did_config,
 };
 
 #[repr(C)]
@@ -215,10 +215,7 @@ impl SecureKeyStore {
             if let Some(exit_status) = NonZeroU32::new(result) {
                 Err(SecureKeyStoreError::ExternalFunctionFailed(exit_status))
             } else {
-                Ok(Some(KeyPair {
-                    public_key,
-                    secret_key,
-                }))
+                Ok(Some(KeyPair { public_key, secret_key }))
             }
         }
     }

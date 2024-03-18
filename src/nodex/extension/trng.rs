@@ -1,5 +1,5 @@
 use crate::{
-    config::{did_config, did::Extension},
+    config::{did::Extension, did_config},
     nodex::runtime::random::{Random, RandomError},
 };
 use std::{ffi::CStr, num::NonZeroU32};
@@ -50,9 +50,7 @@ impl Trng {
                 return Err(TrngError::ExternalFunctionFailed(exit_status));
             }
 
-            Ok(CStr::from_ptr(buffer_ptr as *const core::ffi::c_char)
-                .to_bytes()
-                .to_vec())
+            Ok(CStr::from_ptr(buffer_ptr as *const core::ffi::c_char).to_bytes().to_vec())
         }
     }
 

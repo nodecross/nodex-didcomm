@@ -1,0 +1,14 @@
+edition = "2021"
+indent_style = "Block"
+use_small_heuristics = "Max"
+version = "Two"
+
+# Simplification
+merge_derives = true
+remove_nested_parens = true
+use_field_init_shorthand = true
+use_try_shorthand = true
+
+# Sort
+reorder_imports = true
+reorder_modules = true

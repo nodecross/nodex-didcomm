@@ -19,9 +19,7 @@ pub struct DIDVCService {
 
 impl DIDVCService {
     pub fn new<R: DidRepository + Send + Sync + 'static>(did_repository: R) -> Self {
-        Self {
-            did_repository: Box::new(did_repository),
-        }
+        Self { did_repository: Box::new(did_repository) }
     }
 }
 
@@ -42,9 +40,7 @@ impl DIDVCService {
         issuance_date: DateTime<Utc>,
     ) -> Result<GeneralVcDataModel, DIDVCServiceError> {
         let keyring = keyring::keypair::KeyPairing::load_keyring()?;
-        let did = keyring
-            .get_identifier()
-            .map_err(|_| DIDVCServiceError::MyDIDNotSet)?;
+        let did = keyring.get_identifier().map_err(|_| DIDVCServiceError::MyDIDNotSet)?;
 
         let r#type = "VerifiableCredential".to_string();
         let context = "https://www.w3.org/2018/credentials/v1".to_string();
@@ -56,10 +52,7 @@ impl DIDVCService {
             r#type: vec![r#type],
             context: vec![context],
             issuance_date,
-            credential_subject: CredentialSubject {
-                id: None,
-                container: message.clone(),
-            },
+            credential_subject: CredentialSubject { id: None, container: message.clone() },
             expiration_date: None,
             proof: None,
         };
@@ -96,11 +89,7 @@ impl DIDVCService {
 
         let (verified_model, verified) = CredentialSigner::verify(
             model,
-            &CredentialSignerSuite {
-                did: None,
-                key_id: None,
-                context,
-            },
+            &CredentialSignerSuite { did: None, key_id: None, context },
         )
         .context("failed to verify credential")?;
 

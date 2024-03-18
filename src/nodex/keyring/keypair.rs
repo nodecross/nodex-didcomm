@@ -1,10 +1,6 @@
 use super::secp256k1::{Secp256k1, Secp256k1Context, Secp256k1Error};
 use crate::{
-    config::{
-        did_config,
-        SingletonDidConfig,
-        did::KeyPair
-    },
+    config::{did::KeyPair, did_config, SingletonDidConfig},
     nodex::{
         extension::secure_keystore::{SecureKeyStore, SecureKeyStoreType},
         extension::{secure_keystore::SecureKeyStoreError, trng::Trng},
@@ -53,9 +49,7 @@ impl KeyPairing {
             secure_keystore: &SecureKeyStore,
             key_type: SecureKeyStoreType,
         ) -> Result<Secp256k1, KeyPairingError> {
-            let key_pair = secure_keystore
-                .read(&key_type)?
-                .ok_or(KeyPairingError::KeyNotFound)?;
+            let key_pair = secure_keystore.read(&key_type)?.ok_or(KeyPairingError::KeyNotFound)?;
 
             Secp256k1::new(&Secp256k1Context {
                 public: key_pair.public_key,
@@ -69,14 +63,7 @@ impl KeyPairing {
         let recovery = load_secp256k1(&secure_keystore, SecureKeyStoreType::Recover)?;
         let encrypt = load_secp256k1(&secure_keystore, SecureKeyStoreType::Encrypt)?;
 
-        Ok(KeyPairing {
-            sign,
-            update,
-            recovery,
-            encrypt,
-            config,
-            secure_keystore,
-        })
+        Ok(KeyPairing { sign, update, recovery, encrypt, config, secure_keystore })
     }
 
     pub fn create_keyring() -> Result<Self, KeyPairingError> {
@@ -92,14 +79,7 @@ impl KeyPairing {
         let recovery = Self::generate_secp256k1(&seed, Self::RECOVERY_DERIVATION_PATH)?;
         let encrypt = Self::generate_secp256k1(&seed, Self::ENCRYPT_DERIVATION_PATH)?;
 
-        Ok(KeyPairing {
-            sign,
-            update,
-            recovery,
-            encrypt,
-            config,
-            secure_keystore,
-        })
+        Ok(KeyPairing { sign, update, recovery, encrypt, config, secure_keystore })
     }
 
     pub fn get_sign_key_pair(&self) -> Secp256k1 {
@@ -124,11 +104,8 @@ impl KeyPairing {
     ) -> Result<Secp256k1, KeyPairingError> {
         let node = runtime::bip32::BIP32::get_node(seed, derivation_path)?;
 
-        Secp256k1::new(&Secp256k1Context {
-            public: node.public_key,
-            secret: node.private_key,
-        })
-        .map_err(KeyPairingError::KeyInitializationError)
+        Secp256k1::new(&Secp256k1Context { public: node.public_key, secret: node.private_key })
+            .map_err(KeyPairingError::KeyInitializationError)
     }
 
     pub fn save(&mut self, did: &str) {
@@ -179,10 +156,7 @@ impl KeyPairing {
     }
 
     pub fn get_identifier(&self) -> Result<String, KeyPairingError> {
-        self.config
-            .lock()
-            .get_did()
-            .ok_or(KeyPairingError::DIDNotFound)
+        self.config.lock().get_did().ok_or(KeyPairingError::DIDNotFound)
     }
 }
 

@@ -79,16 +79,10 @@ impl Multihash {
         let digest = encoded[2..].to_vec();
 
         if digest.len() != usize::from(length) {
-            return Err(MultihashError::SizeValidationFailed(
-                usize::from(length),
-                digest.len(),
-            ));
+            return Err(MultihashError::SizeValidationFailed(usize::from(length), digest.len()));
         }
 
-        Ok(DecodedContainer {
-            hash: digest,
-            algorithm: u64::from(code),
-        })
+        Ok(DecodedContainer { hash: digest, algorithm: u64::from(code) })
     }
 }
 
@@ -138,20 +132,14 @@ mod tests {
                 Err(_) => panic!(),
             };
 
-        assert_eq!(
-            result,
-            String::from("EiAEX1W46vVid7IjJyFY5ibjmyrgepTjW0rYrw-wo4xLCw")
-        );
+        assert_eq!(result, String::from("EiAEX1W46vVid7IjJyFY5ibjmyrgepTjW0rYrw-wo4xLCw"));
     }
 
     #[test]
     fn test_hash_then_encode() {
         let result = Multihash::hash_then_encode(message().as_bytes());
 
-        assert_eq!(
-            result,
-            String::from("EiBfRiXU9h7bUngHRV9I-L4njnHoSqlNIxEf-rO2MJOnEw")
-        );
+        assert_eq!(result, String::from("EiBfRiXU9h7bUngHRV9I-L4njnHoSqlNIxEf-rO2MJOnEw"));
     }
 
     #[test]

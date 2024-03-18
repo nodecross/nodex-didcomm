@@ -76,15 +76,9 @@ impl Secp256k1 {
         if context.public.len() == Self::COMPRESSED_PUBLIC_KEY_SIZE {
             let public = Secp256k1::transform_uncompressed_public_key(&context.public)?;
 
-            Ok(Secp256k1 {
-                public,
-                private: context.secret.clone(),
-            })
+            Ok(Secp256k1 { public, private: context.secret.clone() })
         } else if context.public.len() == Self::UNCOMPRESSED_PUBLIC_KEY_SIZE {
-            Ok(Secp256k1 {
-                public: context.public.clone(),
-                private: context.secret.clone(),
-            })
+            Ok(Secp256k1 { public: context.public.clone(), private: context.secret.clone() })
         } else {
             Err(Secp256k1Error::InvalidPublicKeySize)
         }
@@ -175,11 +169,7 @@ impl Secp256k1 {
             id: key_id.to_string(),
             r#type: "EcdsaSecp256k1VerificationKey2019".to_string(),
             jwk,
-            purpose: purpose
-                .to_vec()
-                .iter()
-                .map(|value| value.to_string())
-                .collect(),
+            purpose: purpose.to_vec().iter().map(|value| value.to_string()).collect(),
         })
     }
 
@@ -261,13 +251,12 @@ pub mod tests {
 
     #[test]
     pub fn test_to_hex_key_pair() {
-        let node = match Secp256k1::new(&Secp256k1Context {
-            public: public_key(),
-            secret: private_key(),
-        }) {
-            Ok(v) => v,
-            Err(_) => panic!(),
-        };
+        let node =
+            match Secp256k1::new(&Secp256k1Context { public: public_key(), secret: private_key() })
+            {
+                Ok(v) => v,
+                Err(_) => panic!(),
+            };
 
         let result = node.to_hex_key_pair();
 
@@ -280,13 +269,12 @@ pub mod tests {
 
     #[test]
     pub fn test_get_point_x() {
-        let node = match Secp256k1::new(&Secp256k1Context {
-            public: public_key(),
-            secret: private_key(),
-        }) {
-            Ok(v) => v,
-            Err(_) => panic!(),
-        };
+        let node =
+            match Secp256k1::new(&Secp256k1Context { public: public_key(), secret: private_key() })
+            {
+                Ok(v) => v,
+                Err(_) => panic!(),
+            };
 
         let result = match node.get_point_x() {
             Ok(v) => v,
@@ -305,13 +293,12 @@ pub mod tests {
 
     #[test]
     pub fn test_get_point_y() {
-        let node = match Secp256k1::new(&Secp256k1Context {
-            public: public_key(),
-            secret: private_key(),
-        }) {
-            Ok(v) => v,
-            Err(_) => panic!(),
-        };
+        let node =
+            match Secp256k1::new(&Secp256k1Context { public: public_key(), secret: private_key() })
+            {
+                Ok(v) => v,
+                Err(_) => panic!(),
+            };
 
         let result = match node.get_point_y() {
             Ok(v) => v,
@@ -330,13 +317,12 @@ pub mod tests {
 
     #[test]
     pub fn test_validate_point() {
-        let node = match Secp256k1::new(&Secp256k1Context {
-            public: public_key(),
-            secret: private_key(),
-        }) {
-            Ok(v) => v,
-            Err(_) => panic!(),
-        };
+        let node =
+            match Secp256k1::new(&Secp256k1Context { public: public_key(), secret: private_key() })
+            {
+                Ok(v) => v,
+                Err(_) => panic!(),
+            };
 
         let result = match node.validate_point() {
             Ok(v) => v,
@@ -348,13 +334,12 @@ pub mod tests {
 
     #[test]
     pub fn test_to_jwk_with_private_key() {
-        let node = match Secp256k1::new(&Secp256k1Context {
-            public: public_key(),
-            secret: private_key(),
-        }) {
-            Ok(v) => v,
-            Err(_) => panic!(),
-        };
+        let node =
+            match Secp256k1::new(&Secp256k1Context { public: public_key(), secret: private_key() })
+            {
+                Ok(v) => v,
+                Err(_) => panic!(),
+            };
 
         let result = match node.to_jwk(true) {
             Ok(v) => v,
@@ -365,22 +350,18 @@ pub mod tests {
         assert_eq!(result.crv, "secp256k1");
         assert_eq!(result.x, "cJZFMvCD9F_o6MzqlqIvYBjUakBvWDqyJrGSg6pgXEQ");
         assert_eq!(result.y, "hRuSdOaizirUK0Fp43319ss46BYEs8ouvhHdCFhitJA");
-        assert_eq!(
-            result.d,
-            Some("xzmAWrA9pi3b4DOQrN92FWQKpu0xuPGCQ_BKVyxSjts".to_string())
-        );
+        assert_eq!(result.d, Some("xzmAWrA9pi3b4DOQrN92FWQKpu0xuPGCQ_BKVyxSjts".to_string()));
         assert_eq!(result.kid, None);
     }
 
     #[test]
     pub fn test_to_jwk_without_private_key() {
-        let node = match Secp256k1::new(&Secp256k1Context {
-            public: public_key(),
-            secret: private_key(),
-        }) {
-            Ok(v) => v,
-            Err(_) => panic!(),
-        };
+        let node =
+            match Secp256k1::new(&Secp256k1Context { public: public_key(), secret: private_key() })
+            {
+                Ok(v) => v,
+                Err(_) => panic!(),
+            };
 
         let result = match node.to_jwk(false) {
             Ok(v) => v,
@@ -397,13 +378,12 @@ pub mod tests {
 
     #[test]
     pub fn test_from_jwk_with_private_key() {
-        let node = match Secp256k1::new(&Secp256k1Context {
-            public: public_key(),
-            secret: private_key(),
-        }) {
-            Ok(v) => v,
-            Err(_) => panic!(),
-        };
+        let node =
+            match Secp256k1::new(&Secp256k1Context { public: public_key(), secret: private_key() })
+            {
+                Ok(v) => v,
+                Err(_) => panic!(),
+            };
 
         let jwk = match node.to_jwk(false) {
             Ok(v) => v,
@@ -428,13 +408,12 @@ pub mod tests {
 
     #[test]
     pub fn test_from_jwk_without_private_key() {
-        let node = match Secp256k1::new(&Secp256k1Context {
-            public: public_key(),
-            secret: private_key(),
-        }) {
-            Ok(v) => v,
-            Err(_) => panic!(),
-        };
+        let node =
+            match Secp256k1::new(&Secp256k1Context { public: public_key(), secret: private_key() })
+            {
+                Ok(v) => v,
+                Err(_) => panic!(),
+            };
 
         let jwk = match node.to_jwk(true) {
             Ok(v) => v,
