@@ -31,6 +31,12 @@ pub struct SideTreeError {
     pub error: SideTreeErrorBody,
 }
 
+impl Default for NodeX {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NodeX {
     pub fn new() -> Self {
         let server_config = server_config();

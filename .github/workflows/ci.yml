@@ -47,10 +47,6 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    defaults:
-      run:
-        working-directory: ./packages/hub
-
     steps:
       - uses: actions/checkout@v3
 
@@ -60,9 +56,6 @@ jobs:
 
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
-
-      - name: Run migration tests
-        run: cargo nextest run
 
       - name: Run tests
         run: cargo nextest run
