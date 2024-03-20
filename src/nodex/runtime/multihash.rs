@@ -1,8 +1,8 @@
-use crate::nodex::runtime::base64_url::{Base64Url, PaddingType};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use super::jcs::JcsError;
+use crate::nodex::runtime::base64_url::{Base64Url, PaddingType};
 
 const MULTIHASH_SHA256_CODE: u8 = 0x12; // 0x12 = 18
 const MULTIHASH_SHA256_SIZE: u8 = 0x20; // 0x20 = 32
@@ -88,8 +88,9 @@ impl Multihash {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use rstest::*;
+
+    use super::*;
 
     #[fixture]
     fn message() -> String {

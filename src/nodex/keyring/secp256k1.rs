@@ -1,11 +1,13 @@
-use crate::nodex::{
-    runtime, runtime::base64_url::PaddingType, sidetree::payload::PublicKeyPayload,
-};
+use std::cmp::Ordering;
+
 use hex;
 use ibig::{ibig, IBig};
 use serde::{Deserialize, Serialize};
-use std::cmp::Ordering;
 use thiserror::Error;
+
+use crate::nodex::{
+    runtime, runtime::base64_url::PaddingType, sidetree::payload::PublicKeyPayload,
+};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct KeyPairSecp256K1 {
@@ -231,8 +233,9 @@ impl Secp256k1 {
 
 #[cfg(test)]
 pub mod tests {
-    use super::*;
     use rstest::*;
+
+    use super::*;
 
     #[fixture]
     fn private_key() -> Vec<u8> {

@@ -6,6 +6,7 @@ version = "Two"
 # format target
 format_code_in_doc_comments = true
 format_strings = true
+wrap_comments = true
 
 # Simplification
 merge_derives = true
@@ -14,6 +15,7 @@ use_field_init_shorthand = true
 use_try_shorthand = true
 blank_lines_upper_bound = 1
 normalize_comments = true
+group_imports = "StdExternalCrate"
 
 # Sort
 reorder_imports = true

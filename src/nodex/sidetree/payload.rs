@@ -307,9 +307,8 @@ impl OperationPayloadBuilder {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::nodex::{extension::trng::OSRandomNumberGenerator, keyring};
-
     use super::*;
+    use crate::nodex::{extension::trng::OSRandomNumberGenerator, keyring};
 
     #[test]
     pub fn test_did_create_payload() {

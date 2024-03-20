@@ -3,9 +3,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use thiserror::Error;
 
-use crate::nodex::{keyring::secp256k1::Secp256k1, schema::general::GeneralVcDataModel, utils};
-
 use super::jws::Jws;
+use crate::nodex::{keyring::secp256k1::Secp256k1, schema::general::GeneralVcDataModel, utils};
 
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct Proof {
@@ -120,13 +119,13 @@ impl CredentialSigner {
 
 #[cfg(test)]
 pub mod tests {
+    use rstest::*;
+
+    use super::*;
     use crate::nodex::{
         keyring::{self},
         schema::general::{CredentialSubject, Issuer},
     };
-
-    use super::*;
-    use rstest::*;
 
     #[fixture]
     fn secret_key() -> Vec<u8> {

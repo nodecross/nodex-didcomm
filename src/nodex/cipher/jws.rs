@@ -1,12 +1,12 @@
-use crate::nodex::{
-    keyring::secp256k1::Secp256k1,
-    runtime::{self, base64_url::PaddingType},
-};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use thiserror::Error;
 
 use super::signer::{Signer, SignerError};
+use crate::nodex::{
+    keyring::secp256k1::Secp256k1,
+    runtime::{self, base64_url::PaddingType},
+};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct JWSHeader {
@@ -112,10 +112,10 @@ impl Jws {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::nodex::keyring::{self};
+    use rstest::*;
 
     use super::*;
-    use rstest::*;
+    use crate::nodex::keyring::{self};
 
     #[fixture]
     fn secret_key() -> Vec<u8> {

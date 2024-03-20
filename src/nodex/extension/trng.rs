@@ -1,9 +1,11 @@
+use std::{ffi::CStr, num::NonZeroU32};
+
+use thiserror::Error;
+
 use crate::{
     nodex::runtime::random::{Random, RandomError},
     types::Extension,
 };
-use std::{ffi::CStr, num::NonZeroU32};
-use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum TrngError {

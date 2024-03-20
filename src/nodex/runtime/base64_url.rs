@@ -51,8 +51,9 @@ impl Base64Url {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use rstest::*;
+
+    use super::*;
 
     #[fixture]
     fn message() -> String {

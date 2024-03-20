@@ -1,3 +1,8 @@
+use anyhow::Context;
+use chrono::{DateTime, Utc};
+use serde_json::Value;
+use thiserror::Error;
+
 use crate::{
     nodex::{
         cipher::credential_signer::{
@@ -8,10 +13,6 @@ use crate::{
     },
     repository::did_repository::DidRepository,
 };
-use anyhow::Context;
-use chrono::{DateTime, Utc};
-use serde_json::Value;
-use thiserror::Error;
 
 pub struct DIDVCService {
     did_repository: Box<dyn DidRepository + Send + Sync + 'static>,

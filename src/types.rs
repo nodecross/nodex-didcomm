@@ -1,5 +1,6 @@
-use crate::nodex::keyring::secp256k1::Secp256k1HexKeyPair;
 use serde::{Deserialize, Serialize};
+
+use crate::nodex::keyring::secp256k1::Secp256k1HexKeyPair;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Extension {

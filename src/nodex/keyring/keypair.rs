@@ -1,10 +1,10 @@
 use std::convert::TryFrom;
 
-use super::secp256k1::{Secp256k1, Secp256k1Error, Secp256k1HexKeyPair};
-use crate::nodex::{extension::trng::Trng, runtime};
-
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+
+use super::secp256k1::{Secp256k1, Secp256k1Error, Secp256k1HexKeyPair};
+use crate::nodex::{extension::trng::Trng, runtime};
 
 pub struct KeyPairing {
     pub sign: Secp256k1,
