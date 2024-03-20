@@ -28,18 +28,19 @@ pub struct KeyPairSecp256K1 {
     pub kid: Option<String>,
 }
 
+// TODO: remove this
 pub struct Secp256k1Context {
     pub public: Vec<u8>,
     pub secret: Vec<u8>,
 }
 
-#[allow(dead_code)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Secp256k1HexKeyPair {
     public: String,
     private: String,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Secp256k1 {
     public: Vec<u8>,
     private: Vec<u8>,
@@ -61,6 +62,8 @@ pub enum Secp256k1Error {
     NumberParsingError(#[from] ibig::error::ParseError),
     #[error("Validation Failed")]
     ValidationFailed,
+    #[error("Hex Decode failed")]
+    HexDecodeFailed(#[from] hex::FromHexError),
 }
 
 impl Secp256k1 {
@@ -92,12 +95,18 @@ impl Secp256k1 {
         self.private.clone()
     }
 
-    #[allow(dead_code)]
     pub fn to_hex_key_pair(&self) -> Secp256k1HexKeyPair {
         Secp256k1HexKeyPair {
             public: hex::encode(self.get_public_key()),
             private: hex::encode(self.get_secret_key()),
         }
+    }
+
+    pub fn from_hex_key_pair(hex_key_pair: &Secp256k1HexKeyPair) -> Result<Self, Secp256k1Error> {
+        let public = hex::decode(&hex_key_pair.public)?;
+        let private = hex::decode(&hex_key_pair.private)?;
+
+        Self::new(&Secp256k1Context { public, secret: private })
     }
 
     pub fn from_jwk(jwk: &KeyPairSecp256K1) -> Result<Self, Secp256k1Error> {
@@ -264,7 +273,10 @@ pub mod tests {
             result.private,
             "c739805ab03da62ddbe03390acdf7615640aa6ed31b8f18243f04a572c528edb"
         );
-        assert_eq!(result.public, "0470964532f083f45fe8e8ccea96a22f6018d46a406f583ab226b19283aa605c44851b9274e6a2ce2ad42b4169e37df5f6cb38e81604b3ca2ebe11dd085862b490");
+        assert_eq!(
+            result.public,
+            "0470964532f083f45fe8e8ccea96a22f6018d46a406f583ab226b19283aa605c44851b9274e6a2ce2ad42b4169e37df5f6cb38e81604b3ca2ebe11dd085862b490"
+        );
     }
 
     #[test]

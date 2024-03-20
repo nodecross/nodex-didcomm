@@ -1,10 +1,7 @@
 use std::{ffi::CStr, num::NonZeroU32};
 use thiserror::Error;
 
-use crate::{
-    config::did::{Extension, KeyPair},
-    config::did_config,
-};
+use crate::types::{Extension, KeyPair};
 
 #[repr(C)]
 enum SecureKeystoreType {
