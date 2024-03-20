@@ -35,8 +35,9 @@ impl BIP32 {
 
 #[cfg(test)]
 pub mod tests {
-    use super::*;
     use rstest::*;
+
+    use super::*;
 
     #[fixture]
     fn seed() -> Vec<u8> {

@@ -1,5 +1,6 @@
-use crate::nodex::{keyring::secp256k1::Secp256k1, runtime};
 use thiserror::Error;
+
+use crate::nodex::{keyring::secp256k1::Secp256k1, runtime};
 
 pub struct Signer {}
 
@@ -32,10 +33,10 @@ impl Signer {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::nodex::keyring::{self};
+    use rstest::*;
 
     use super::*;
-    use rstest::*;
+    use crate::nodex::keyring::{self};
 
     #[fixture]
     fn secret_key() -> Vec<u8> {

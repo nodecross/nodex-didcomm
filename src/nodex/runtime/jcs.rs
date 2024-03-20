@@ -1,6 +1,5 @@
 use serde_jcs;
 use serde_json::{self, Value};
-
 use thiserror::Error;
 
 pub struct Jcs {}
@@ -23,8 +22,9 @@ impl Jcs {
 
 #[cfg(test)]
 pub mod tests {
-    use super::*;
     use rstest::*;
+
+    use super::*;
 
     #[fixture]
     fn json() -> String {

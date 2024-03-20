@@ -82,8 +82,9 @@ impl Secp256k1 {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use rstest::*;
+
+    use super::*;
 
     #[fixture]
     fn message() -> String {

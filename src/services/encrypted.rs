@@ -1,3 +1,15 @@
+use anyhow::Context;
+use arrayref::array_ref;
+use chrono::{DateTime, Utc};
+use cuid;
+use didcomm_rs::{
+    crypto::{CryptoAlgorithm, SignatureAlgorithm},
+    AttachmentBuilder, AttachmentDataBuilder, Message,
+};
+use serde_json::Value;
+use thiserror::Error;
+use x25519_dalek::{PublicKey, StaticSecret};
+
 use super::{
     did_vc::{DIDVCService, DIDVCServiceGenerateError, DIDVCServiceVerifyError},
     types::VerifiedContainer,
@@ -14,17 +26,6 @@ use crate::{
     },
     repository::did_repository::DidRepository,
 };
-use anyhow::Context;
-use arrayref::array_ref;
-use chrono::{DateTime, Utc};
-use cuid;
-use didcomm_rs::{
-    crypto::{CryptoAlgorithm, SignatureAlgorithm},
-    AttachmentBuilder, AttachmentDataBuilder, Message,
-};
-use serde_json::Value;
-use thiserror::Error;
-use x25519_dalek::{PublicKey, StaticSecret};
 
 pub struct DIDCommEncryptedService {
     did_repository: Box<dyn DidRepository + Send + Sync + 'static>,
