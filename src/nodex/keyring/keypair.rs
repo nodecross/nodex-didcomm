@@ -1,6 +1,6 @@
 use std::convert::TryFrom;
 
-use super::secp256k1::{Secp256k1, Secp256k1Context, Secp256k1Error, Secp256k1HexKeyPair};
+use super::secp256k1::{Secp256k1, Secp256k1Error, Secp256k1HexKeyPair};
 use crate::nodex::{extension::trng::Trng, runtime};
 
 use serde::{Deserialize, Serialize};
@@ -59,7 +59,7 @@ impl KeyPairing {
     ) -> Result<Secp256k1, KeyPairingError> {
         let node = runtime::bip32::BIP32::get_node(seed, derivation_path)?;
 
-        Secp256k1::new(&Secp256k1Context { public: node.public_key, secret: node.private_key })
+        Secp256k1::new(node.public_key, node.private_key)
             .map_err(KeyPairingError::KeyInitializationError)
     }
 }

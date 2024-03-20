@@ -112,7 +112,7 @@ impl Jws {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::nodex::keyring::{self, secp256k1::Secp256k1Context};
+    use crate::nodex::keyring::{self};
 
     use super::*;
     use rstest::*;
@@ -149,10 +149,7 @@ pub mod tests {
 
     #[test]
     pub fn test_encode() {
-        let context = match keyring::secp256k1::Secp256k1::new(&Secp256k1Context {
-            public: public_key(),
-            secret: secret_key(),
-        }) {
+        let context = match keyring::secp256k1::Secp256k1::new(public_key(), secret_key()) {
             Ok(v) => v,
             Err(_) => panic!(),
         };
@@ -172,10 +169,7 @@ pub mod tests {
 
     #[test]
     pub fn test_verify() {
-        let context = match keyring::secp256k1::Secp256k1::new(&Secp256k1Context {
-            public: public_key(),
-            secret: secret_key(),
-        }) {
+        let context = match keyring::secp256k1::Secp256k1::new(public_key(), secret_key()) {
             Ok(v) => v,
             Err(_) => panic!(),
         };

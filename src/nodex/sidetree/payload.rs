@@ -2,10 +2,13 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use thiserror::Error;
 
-use crate::nodex::keyring::secp256k1::KeyPairSecp256K1;
-use crate::nodex::runtime::base64_url::Base64Url;
-use crate::nodex::runtime::base64_url::PaddingType;
-use crate::nodex::runtime::multihash::Multihash;
+use crate::nodex::{
+    keyring::secp256k1::KeyPairSecp256K1,
+    runtime::{
+        base64_url::{Base64Url, PaddingType},
+        multihash::Multihash,
+    },
+};
 
 pub struct OperationPayloadBuilder {}
 
@@ -152,8 +155,8 @@ struct DIDReplaceSuffixObject {
 // ACTION: ietf-json-patch
 #[allow(dead_code)]
 struct DIDIetfJsonPatchAction {
-    action: String, // 'replace',
-                    // patches: Vec<>
+    action: String, /* 'replace',
+                     * patches: Vec<> */
 }
 
 #[allow(dead_code)]
