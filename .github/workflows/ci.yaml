@@ -30,8 +30,8 @@ jobs:
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
 
-      # install rust nightly for rustfmt and clippy
-      - uses: dtolnay/rust-toolchain@nightly
+      - name: install rust nightly for rustfmt and clippy
+        uses: dtolnay/rust-toolchain@nightly
         with:
           components: rustfmt, clippy
 
