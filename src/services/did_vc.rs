@@ -6,9 +6,10 @@ use thiserror::Error;
 use crate::{
     nodex::{
         cipher::credential_signer::{
-            CredentialSigner, CredentialSignerError, CredentialSignerSuite,
+            CredentialSigner, CredentialSignerSignError, CredentialSignerSuite,
+            CredentialSignerVerifyError,
         },
-        keyring::{self},
+        keyring,
         schema::general::{CredentialSubject, GeneralVcDataModel, Issuer},
     },
     repository::did_repository::DidRepository,
@@ -27,7 +28,7 @@ impl DIDVCService {
 #[derive(Debug, Error)]
 pub enum DIDVCServiceGenerateError {
     #[error("credential signer error")]
-    CredentialSignerError(#[from] CredentialSignerError),
+    SignFailed(#[from] CredentialSignerSignError),
 }
 
 #[derive(Debug, Error)]
@@ -37,7 +38,7 @@ pub enum DIDVCServiceVerifyError {
     #[error("did public key not found. did: {0}")]
     PublicKeyNotFound(String),
     #[error("credential signer error")]
-    CredentialSignerError(#[from] CredentialSignerError),
+    VerifyFailed(#[from] CredentialSignerVerifyError),
     #[error("public_keys length must be 1")]
     PublicKeyLengthMismatch,
     #[error("signature is not verified")]

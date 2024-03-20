@@ -24,16 +24,12 @@ pub struct KeyPairingHex {
 
 #[derive(Error, Debug)]
 pub enum KeyPairingError {
-    #[error("key not found")]
-    KeyNotFound,
     #[error("secp256k1 error")]
     KeyInitializationError(#[from] Secp256k1Error),
     #[error("Trng error")]
     TrngError(#[from] crate::nodex::extension::trng::TrngError),
     #[error("BIP32 error")]
     BIP32Error(#[from] runtime::bip32::BIP32Error),
-    #[error("DID not found")]
-    DIDNotFound,
 }
 
 impl KeyPairing {

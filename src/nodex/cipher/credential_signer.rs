@@ -46,15 +46,19 @@ pub struct CredentialSignerSuite<'a> {
 }
 
 #[derive(Debug, Error)]
-pub enum CredentialSignerError {
+pub enum CredentialSignerSignError {
+    #[error("jws error: {0:?}")]
+    JwsError(#[from] super::jws::JwsEncodeError),
+    #[error("json parse error: {0:?}")]
+    JsonParseError(#[from] serde_json::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum CredentialSignerVerifyError {
     #[error("jws error: {0:?}")]
     JwsError(#[from] super::jws::JwsError),
     #[error("json parse error: {0:?}")]
     JsonParseError(#[from] serde_json::Error),
-    #[error("did is none. please set did")]
-    DidIsNone,
-    #[error("key_id is none. please set key_id")]
-    KeyIdIsNone,
     #[error("proof not found")]
     ProofNotFound,
 }
@@ -68,7 +72,7 @@ impl CredentialSigner {
     pub fn sign(
         object: &GeneralVcDataModel,
         suite: CredentialSignerSuite,
-    ) -> Result<GeneralVcDataModel, CredentialSignerError> {
+    ) -> Result<GeneralVcDataModel, CredentialSignerSignError> {
         // FIXME:
         // if (Object.keys(object).indexOf(this.PROOF_KEY) !== -1) {
         //     throw new Error()
@@ -104,8 +108,8 @@ impl CredentialSigner {
     pub fn verify(
         mut object: GeneralVcDataModel,
         context: &Secp256k1,
-    ) -> Result<(GeneralVcDataModel, bool), CredentialSignerError> {
-        let proof = object.proof.take().ok_or(CredentialSignerError::ProofNotFound)?;
+    ) -> Result<(GeneralVcDataModel, bool), CredentialSignerVerifyError> {
+        let proof = object.proof.take().ok_or(CredentialSignerVerifyError::ProofNotFound)?;
 
         let jws = proof.jws;
         let payload = serde_json::to_value(&object)?;
