@@ -211,7 +211,10 @@ pub mod tests {
 
         match result.proof {
             Some(proof) => {
-                assert_eq!(proof.jws, "eyJhbGciOiJFUzI1NksiLCJiNjQiOmZhbHNlLCJjcml0IjpbImI2NCJdfQ..Qc-NyzQu2v735_qPR72j1oqUDK1Ne4XQ7Lc66_x9tlMSeI9xmrgguEA8UmQyTM0cd13xkvpK4g-NEWJBp8_d_w");
+                assert_eq!(
+                    proof.jws,
+                    "eyJhbGciOiJFUzI1NksiLCJiNjQiOmZhbHNlLCJjcml0IjpbImI2NCJdfQ..Qc-NyzQu2v735_qPR72j1oqUDK1Ne4XQ7Lc66_x9tlMSeI9xmrgguEA8UmQyTM0cd13xkvpK4g-NEWJBp8_d_w"
+                );
                 assert_eq!(proof.proof_purpose, "authentication");
                 assert_eq!(proof.r#type, "EcdsaSecp256k1Signature2019");
                 assert_eq!(

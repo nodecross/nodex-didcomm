@@ -264,7 +264,10 @@ pub mod tests {
             result.private,
             "c739805ab03da62ddbe03390acdf7615640aa6ed31b8f18243f04a572c528edb"
         );
-        assert_eq!(result.public, "0470964532f083f45fe8e8ccea96a22f6018d46a406f583ab226b19283aa605c44851b9274e6a2ce2ad42b4169e37df5f6cb38e81604b3ca2ebe11dd085862b490");
+        assert_eq!(
+            result.public,
+            "0470964532f083f45fe8e8ccea96a22f6018d46a406f583ab226b19283aa605c44851b9274e6a2ce2ad42b4169e37df5f6cb38e81604b3ca2ebe11dd085862b490"
+        );
     }
 
     #[test]
