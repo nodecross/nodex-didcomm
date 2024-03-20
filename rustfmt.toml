@@ -9,19 +9,18 @@ format_strings = true
 wrap_comments = true
 
 # Simplification
+blank_lines_upper_bound = 1
+group_imports = "StdExternalCrate"
 merge_derives = true
+normalize_comments = true
 remove_nested_parens = true
 use_field_init_shorthand = true
 use_try_shorthand = true
-blank_lines_upper_bound = 1
-normalize_comments = true
-group_imports = "StdExternalCrate"
 
 # Sort
+imports_granularity = "Crate"
 reorder_imports = true
 reorder_modules = true
-imports_granularity="Crate"
-
 
 # Indentation
 enum_discrim_align_threshold = 10
