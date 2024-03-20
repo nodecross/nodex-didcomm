@@ -240,75 +240,16 @@ impl DIDCommEncryptedService {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::BTreeMap, iter::FromIterator};
+    use std::{collections::BTreeMap, iter::FromIterator as _};
 
-    use anyhow::Ok;
-    use rand::distributions::{Alphanumeric, DistString as _};
     use serde_json::json;
 
     use super::*;
     use crate::{
-        nodex::{
-            extension::trng::OSRandomNumberGenerator,
-            keyring::keypair::KeyPairing,
-            sidetree::payload::{DIDDocument, DIDResolutionResponse, DidPublicKey, MethodMetadata},
-        },
-        repository::did_repository::DidRepository,
+        nodex::{extension::trng::OSRandomNumberGenerator, keyring::keypair::KeyPairing},
+        repository::did_repository::mocks::MockDidRepository,
+        services::test_utils::create_random_did,
     };
-
-    #[derive(Clone)]
-    struct MockDidRepository {
-        map: BTreeMap<String, KeyPairing>,
-    }
-
-    impl MockDidRepository {
-        pub fn new(map: BTreeMap<String, KeyPairing>) -> Self {
-            Self { map }
-        }
-    }
-
-    #[async_trait::async_trait]
-    impl DidRepository for MockDidRepository {
-        async fn create_identifier(&self) -> anyhow::Result<DIDResolutionResponse> {
-            unimplemented!()
-        }
-        async fn find_identifier(
-            &self,
-            did: &str,
-        ) -> anyhow::Result<Option<DIDResolutionResponse>> {
-            if let Some(keyring) = self.map.get(did) {
-                let jwk = keyring.sign.to_jwk(false)?;
-
-                let response = DIDResolutionResponse {
-                    context: "https://www.w3.org/ns/did-resolution/v1".to_string(),
-                    did_document: DIDDocument {
-                        id: did.to_string(),
-                        public_key: Some(vec![DidPublicKey {
-                            id: did.to_string() + "#signingKey",
-                            controller: String::new(),
-                            r#type: "EcdsaSecp256k1VerificationKey2019".to_string(),
-                            public_key_jwk: jwk,
-                        }]),
-                        service: None,
-                        authentication: Some(vec!["signingKey".to_string()]),
-                    },
-                    method_metadata: MethodMetadata {
-                        published: true,
-                        recovery_commitment: None,
-                        update_commitment: None,
-                    },
-                };
-                Ok(Some(response))
-            } else {
-                Ok(None)
-            }
-        }
-    }
-
-    fn create_random_did() -> String {
-        let random_string = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
-        format!("did:nodex:test:{}", random_string)
-    }
 
     #[actix_rt::test]
     async fn test_generate_and_verify() {
