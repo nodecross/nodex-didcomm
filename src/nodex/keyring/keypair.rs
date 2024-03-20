@@ -6,6 +6,7 @@ use thiserror::Error;
 use super::secp256k1::{Secp256k1, Secp256k1Error, Secp256k1HexKeyPair};
 use crate::nodex::{extension::trng::Trng, runtime};
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KeyPairing {
     pub sign: Secp256k1,
     pub update: Secp256k1,
@@ -25,9 +26,9 @@ pub struct KeyPairingHex {
 #[derive(Error, Debug)]
 pub enum KeyPairingError {
     #[error("secp256k1 error")]
-    KeyInitializationError(#[from] Secp256k1Error),
+    KeyInitializationFailed(#[from] Secp256k1Error),
     #[error("Trng error")]
-    TrngError(#[from] crate::nodex::extension::trng::TrngError),
+    TrngGenerationFailed(#[from] crate::nodex::extension::trng::TrngError),
     #[error("BIP32 error")]
     BIP32Error(#[from] runtime::bip32::BIP32Error),
 }
@@ -38,7 +39,7 @@ impl KeyPairing {
     const RECOVERY_DERIVATION_PATH: &'static str = "m/44'/0'/0'/0/30";
     const ENCRYPT_DERIVATION_PATH: &'static str = "m/44'/0'/0'/0/40";
 
-    pub fn create_keyring<T: Trng>(trng: T) -> Result<Self, KeyPairingError> {
+    pub fn create_keyring<T: Trng>(trng: &T) -> Result<Self, KeyPairingError> {
         let seed = trng.generate(&(256 / 8))?;
 
         let sign = Self::generate_secp256k1(&seed, Self::SIGN_DERIVATION_PATH)?;
@@ -56,7 +57,7 @@ impl KeyPairing {
         let node = runtime::bip32::BIP32::get_node(seed, derivation_path)?;
 
         Secp256k1::new(node.public_key, node.private_key)
-            .map_err(KeyPairingError::KeyInitializationError)
+            .map_err(KeyPairingError::KeyInitializationFailed)
     }
 }
 
@@ -92,7 +93,7 @@ pub mod tests {
     #[test]
     pub fn test_create_keyring() {
         let trng = OSRandomNumberGenerator::default();
-        let keyring = KeyPairing::create_keyring(trng).unwrap();
+        let keyring = KeyPairing::create_keyring(&trng).unwrap();
 
         assert_eq!(keyring.sign.get_secret_key().len(), 32);
         assert_eq!(keyring.update.get_secret_key().len(), 32);

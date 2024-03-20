@@ -36,7 +36,7 @@ pub struct Secp256k1HexKeyPair {
     private: String,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Secp256k1 {
     public: Vec<u8>,
     private: Vec<u8>,

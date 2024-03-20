@@ -313,7 +313,7 @@ pub mod tests {
     #[test]
     pub fn test_did_create_payload() {
         let trng: OSRandomNumberGenerator = OSRandomNumberGenerator::default();
-        let keyring = match keyring::keypair::KeyPairing::create_keyring(trng) {
+        let keyring = match keyring::keypair::KeyPairing::create_keyring(&trng) {
             Ok(v) => v,
             Err(_) => panic!(),
         };
@@ -331,7 +331,7 @@ pub mod tests {
             Err(_) => panic!(),
         };
 
-        let result = match OperationPayloadBuilder::did_create_payload(&DIDCreateRequest {
+        let _result = match OperationPayloadBuilder::did_create_payload(&DIDCreateRequest {
             public_keys: vec![public],
             commitment_keys: CommitmentKeys { recovery, update },
             service_endpoints: vec![],
@@ -339,7 +339,5 @@ pub mod tests {
             Ok(v) => v,
             Err(_) => panic!(),
         };
-
-        println!("{}", json!(&result));
     }
 }

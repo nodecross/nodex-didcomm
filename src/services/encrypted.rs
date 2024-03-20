@@ -162,13 +162,9 @@ impl DIDCommEncryptedService {
     pub async fn verify(
         &self,
         my_keyring: &KeyPairing,
-        message: &Value,
+        message: &DIDCommMessage,
     ) -> Result<VerifiedContainer, DIDCommEncryptedServiceVerifyError> {
-        let protected = message
-            .get("protected")
-            .context("protected not found")?
-            .as_str()
-            .context("failed to serialize protected")?;
+        let protected = &message.protected;
 
         let decoded = base64_url::Base64Url::decode_as_string(protected, &PaddingType::NoPadding)
             .context("failed to base64 decode protected")?;
@@ -210,7 +206,7 @@ impl DIDCommEncryptedService {
         let pk = PublicKey::from(&sk);
 
         let message = Message::receive(
-            &message.to_string(),
+            &serde_json::to_string(&message).context("failed to serialize didcomm message")?,
             Some(sk.to_bytes().as_ref()),
             Some(pk.as_bytes().to_vec()),
             Some(&other_key.get_public_key()),
@@ -239,5 +235,110 @@ impl DIDCommEncryptedService {
             }
             None => Ok(VerifiedContainer { message: body, metadata: None }),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{collections::BTreeMap, iter::FromIterator};
+
+    use anyhow::Ok;
+    use rand::distributions::{Alphanumeric, DistString as _};
+    use serde_json::json;
+
+    use super::*;
+    use crate::{
+        nodex::{
+            extension::trng::OSRandomNumberGenerator,
+            keyring::keypair::KeyPairing,
+            sidetree::payload::{DIDDocument, DIDResolutionResponse, DidPublicKey, MethodMetadata},
+        },
+        repository::did_repository::DidRepository,
+    };
+
+    #[derive(Clone)]
+    struct MockDidRepository {
+        map: BTreeMap<String, KeyPairing>,
+    }
+
+    impl MockDidRepository {
+        pub fn new(map: BTreeMap<String, KeyPairing>) -> Self {
+            Self { map }
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl DidRepository for MockDidRepository {
+        async fn create_identifier(&self) -> anyhow::Result<DIDResolutionResponse> {
+            unimplemented!()
+        }
+        async fn find_identifier(
+            &self,
+            did: &str,
+        ) -> anyhow::Result<Option<DIDResolutionResponse>> {
+            if let Some(keyring) = self.map.get(did) {
+                let jwk = keyring.sign.to_jwk(false)?;
+
+                let response = DIDResolutionResponse {
+                    context: "https://www.w3.org/ns/did-resolution/v1".to_string(),
+                    did_document: DIDDocument {
+                        id: did.to_string(),
+                        public_key: Some(vec![DidPublicKey {
+                            id: did.to_string() + "#signingKey",
+                            controller: String::new(),
+                            r#type: "EcdsaSecp256k1VerificationKey2019".to_string(),
+                            public_key_jwk: jwk,
+                        }]),
+                        service: None,
+                        authentication: Some(vec!["signingKey".to_string()]),
+                    },
+                    method_metadata: MethodMetadata {
+                        published: true,
+                        recovery_commitment: None,
+                        update_commitment: None,
+                    },
+                };
+                Ok(Some(response))
+            } else {
+                Ok(None)
+            }
+        }
+    }
+
+    fn create_random_did() -> String {
+        let random_string = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
+        format!("did:nodex:test:{}", random_string)
+    }
+
+    #[actix_rt::test]
+    async fn test_generate_and_verify() {
+        let from_did = create_random_did();
+        let to_did = create_random_did();
+
+        let trng = OSRandomNumberGenerator::default();
+        let from_keyring = KeyPairing::create_keyring(&trng).unwrap();
+        let to_keyring = KeyPairing::create_keyring(&trng).unwrap();
+
+        let repo = MockDidRepository::new(BTreeMap::from_iter([
+            (from_did.clone(), from_keyring.clone()),
+            (to_did.clone(), to_keyring.clone()),
+        ]));
+
+        let service = DIDVCService::new(repo.clone());
+        let service = DIDCommEncryptedService::new(repo, service, None);
+
+        let message = json!({"test": "0123456789abcdef"});
+        let issuance_date = Utc::now();
+
+        let res = service
+            .generate(&from_did, &to_did, &from_keyring, &message, None, issuance_date)
+            .await
+            .unwrap();
+
+        let verified = service.verify(&to_keyring, &res).await.unwrap();
+        let verified = verified.message;
+
+        assert_eq!(verified.issuer.id, from_did);
+        assert_eq!(verified.credential_subject.container, message);
     }
 }
