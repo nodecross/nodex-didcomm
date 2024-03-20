@@ -1,11 +1,11 @@
 use super::{
-    attachment_link,
-    did_vc::{DIDVCService, DIDVCServiceError},
+    did_vc::{DIDVCService, DIDVCServiceGenerateError, DIDVCServiceVerifyError},
     types::VerifiedContainer,
 };
 use crate::{
+    didcomm::DIDCommMessage,
     nodex::{
-        keyring,
+        keyring::{self, keypair::KeyPairing},
         runtime::{
             self,
             base64_url::{self, PaddingType},
@@ -29,6 +29,25 @@ use x25519_dalek::{PublicKey, StaticSecret};
 pub struct DIDCommEncryptedService {
     did_repository: Box<dyn DidRepository + Send + Sync + 'static>,
     vc_service: DIDVCService,
+    attachment_link: String,
+}
+
+#[derive(Debug, Error)]
+pub enum DIDCommEncryptedServiceGenerateError {
+    #[error("key pairing error")]
+    KeyParingError(#[from] keyring::keypair::KeyPairingError),
+    #[error("Secp256k1 error")]
+    KeyringSecp256k1Error(#[from] keyring::secp256k1::Secp256k1Error),
+    #[error("Secp256k1 error")]
+    RuntimeSecp256k1Error(#[from] runtime::secp256k1::Secp256k1Error),
+    #[error("did not found : {0}")]
+    DIDNotFound(String),
+    #[error("did public key not found. did: {0}")]
+    DidPublicKeyNotFound(String),
+    #[error("something went wrong with vc service")]
+    VCServiceError(#[from] DIDVCServiceGenerateError),
+    #[error(transparent)]
+    Other(#[from] anyhow::Error),
 }
 
 #[derive(Debug, Error)]
@@ -44,7 +63,7 @@ pub enum DIDCommEncryptedServiceError {
     #[error("did public key not found")]
     DidPublicKeyNotFound,
     #[error("something went wrong with vc service")]
-    VCServiceError(#[from] DIDVCServiceError),
+    VCServiceError(#[from] DIDVCServiceVerifyError),
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
@@ -53,32 +72,38 @@ impl DIDCommEncryptedService {
     pub fn new<R: DidRepository + Send + Sync + 'static>(
         did_repository: R,
         vc_service: DIDVCService,
+        attachment_link: Option<String>,
     ) -> DIDCommEncryptedService {
-        DIDCommEncryptedService { did_repository: Box::new(did_repository), vc_service }
+        fn default_attachment_link() -> String {
+            std::env::var("NODEX_DID_ATTACHMENT_LINK")
+                .unwrap_or("https://did.getnodex.io".to_string())
+        }
+
+        DIDCommEncryptedService {
+            did_repository: Box::new(did_repository),
+            vc_service,
+            attachment_link: attachment_link.unwrap_or(default_attachment_link()),
+        }
     }
 
     pub async fn generate(
         &self,
+        from_did: &str,
         to_did: &str,
+        from_keyring: &KeyPairing,
         message: &Value,
         metadata: Option<&Value>,
         issuance_date: DateTime<Utc>,
-    ) -> Result<Value, DIDCommEncryptedServiceError> {
-        // NOTE: recipient from
-        let my_keyring = keyring::keypair::KeyPairing::load_keyring()?;
-        let my_did = my_keyring.get_identifier()?;
-
+    ) -> Result<DIDCommMessage, DIDCommEncryptedServiceGenerateError> {
         // NOTE: recipient to
-        let did_document = self
-            .did_repository
-            .find_identifier(to_did)
-            .await?
-            .ok_or(DIDCommEncryptedServiceError::DIDNotFound(to_did.to_string()))?;
+        let did_document =
+            self.did_repository.find_identifier(to_did).await?.ok_or_else(|| {
+                DIDCommEncryptedServiceGenerateError::DIDNotFound(to_did.to_string())
+            })?;
 
-        let public_keys = did_document
-            .did_document
-            .public_key
-            .ok_or(DIDCommEncryptedServiceError::DidPublicKeyNotFound)?;
+        let public_keys = did_document.did_document.public_key.ok_or_else(|| {
+            DIDCommEncryptedServiceGenerateError::DidPublicKeyNotFound(to_did.to_string())
+        })?;
 
         // FIXME: workaround
         if public_keys.len() != 1 {
@@ -91,7 +116,7 @@ impl DIDCommEncryptedService {
 
         // NOTE: ecdh
         let shared_key = runtime::secp256k1::Secp256k1::ecdh(
-            &my_keyring.get_sign_key_pair().get_secret_key(),
+            &from_keyring.sign.get_secret_key(),
             &other_key.get_public_key(),
         )?;
 
@@ -99,11 +124,11 @@ impl DIDCommEncryptedService {
         let pk = PublicKey::from(&sk);
 
         // NOTE: message
-        let body = self.vc_service.generate(message, issuance_date)?;
+        let body = self.vc_service.generate(from_did, from_keyring, message, issuance_date)?;
         let body = serde_json::to_string(&body).context("failed to serialize")?;
 
         let mut message =
-            Message::new().from(&my_did).to(&[to_did]).body(&body).map_err(|e| {
+            Message::new().from(from_did).to(&[to_did]).body(&body).map_err(|e| {
                 anyhow::anyhow!("Failed to initialize message with error = {:?}", e)
             })?;
 
@@ -113,7 +138,7 @@ impl DIDCommEncryptedService {
 
             // let media_type = "application/json";
             let data = AttachmentDataBuilder::new()
-                .with_link(&attachment_link())
+                .with_link(&self.attachment_link)
                 .with_json(&value.to_string());
 
             message.append_attachment(
@@ -127,22 +152,19 @@ impl DIDCommEncryptedService {
                 sk.to_bytes().as_ref(),
                 Some(vec![Some(pk.as_bytes().to_vec())]),
                 SignatureAlgorithm::Es256k,
-                &my_keyring.get_sign_key_pair().get_secret_key(),
+                &from_keyring.sign.get_secret_key(),
             )
             .map_err(|e| anyhow::anyhow!("failed to encrypt message : {:?}", e))?;
 
-        Ok(serde_json::from_str::<Value>(&seal_signed_message)
+        Ok(serde_json::from_str::<DIDCommMessage>(&seal_signed_message)
             .context("failed to convert to json")?)
     }
 
     pub async fn verify(
         &self,
+        my_keyring: &KeyPairing,
         message: &Value,
     ) -> Result<VerifiedContainer, DIDCommEncryptedServiceError> {
-        // NOTE: recipient to
-        let my_keyring = keyring::keypair::KeyPairing::load_keyring()?;
-
-        // NOTE: recipient from
         let protected = message
             .get("protected")
             .context("protected not found")?
@@ -181,7 +203,7 @@ impl DIDCommEncryptedService {
 
         // NOTE: ecdh
         let shared_key = runtime::secp256k1::Secp256k1::ecdh(
-            &my_keyring.get_sign_key_pair().get_secret_key(),
+            &my_keyring.sign.get_secret_key(),
             &other_key.get_public_key(),
         )?;
 

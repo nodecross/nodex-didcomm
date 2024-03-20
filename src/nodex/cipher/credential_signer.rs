@@ -40,10 +40,10 @@ pub struct ProofContext {
     pub proof: Option<Proof>,
 }
 
-pub struct CredentialSignerSuite {
-    pub did: Option<String>,
-    pub key_id: Option<String>,
-    pub context: Secp256k1,
+pub struct CredentialSignerSuite<'a> {
+    pub did: &'a str,
+    pub key_id: &'a str,
+    pub context: &'a Secp256k1,
 }
 
 #[derive(Debug, Error)]
@@ -68,7 +68,7 @@ impl CredentialSigner {
 
     pub fn sign(
         object: &GeneralVcDataModel,
-        suite: &CredentialSignerSuite,
+        suite: CredentialSignerSuite,
     ) -> Result<GeneralVcDataModel, CredentialSignerError> {
         // FIXME:
         // if (Object.keys(object).indexOf(this.PROOF_KEY) !== -1) {
@@ -76,16 +76,10 @@ impl CredentialSigner {
         // }
 
         let created = Utc::now().to_rfc3339();
-        let jws = Jws::encode(&json!(object), &suite.context)?;
+        let jws = Jws::encode(&json!(object), suite.context)?;
 
-        let did = match &suite.did {
-            Some(v) => v,
-            None => return Err(CredentialSignerError::DidIsNone),
-        };
-        let key_id = match &suite.key_id {
-            Some(v) => v,
-            None => return Err(CredentialSignerError::KeyIdIsNone),
-        };
+        let did = suite.did;
+        let key_id = suite.key_id;
 
         let proof: ProofContext = ProofContext {
             proof: Some(Proof {
@@ -110,31 +104,15 @@ impl CredentialSigner {
 
     pub fn verify(
         mut object: GeneralVcDataModel,
-        suite: &CredentialSignerSuite,
+        context: &Secp256k1,
     ) -> Result<(GeneralVcDataModel, bool), CredentialSignerError> {
-        // FIXME:
-        // if (Object.keys(object).indexOf(this.PROOF_KEY) === -1) {
-        //     throw new Error()
-        // }
-
         let proof = object.proof.take().ok_or(CredentialSignerError::ProofNotFound)?;
-
-        // FIXME:
-        // if (proof === undefined) {
-        //     throw new NodeXNotCompatibleError()
-        // }
-
-        // FIXME:
-        // const vm = utils.splitDid(proof.verificationMethod)
-        // if (vm.keyId !== suite.keyId) {
-        //     throw new NodeXNotCompatibleError()
-        // }
 
         let jws = proof.jws;
         let payload = serde_json::to_value(&object)?;
 
         // NOTE: verify
-        let verified = Jws::verify(&payload, &jws, &suite.context)?;
+        let verified = Jws::verify(&payload, &jws, context)?;
 
         Ok((object, verified))
     }
@@ -199,10 +177,10 @@ pub mod tests {
 
         let result = match CredentialSigner::sign(
             &model,
-            &CredentialSignerSuite {
-                did: Some("did:nodex:test:000000000000000000000000000000".to_string()),
-                key_id: Some("signingKey".to_string()),
-                context,
+            CredentialSignerSuite {
+                did: "did:nodex:test:000000000000000000000000000000",
+                key_id: "signingKey",
+                context: &context,
             },
         ) {
             Ok(v) => v,
@@ -211,7 +189,10 @@ pub mod tests {
 
         match result.proof {
             Some(proof) => {
-                assert_eq!(proof.jws, "eyJhbGciOiJFUzI1NksiLCJiNjQiOmZhbHNlLCJjcml0IjpbImI2NCJdfQ..Qc-NyzQu2v735_qPR72j1oqUDK1Ne4XQ7Lc66_x9tlMSeI9xmrgguEA8UmQyTM0cd13xkvpK4g-NEWJBp8_d_w");
+                assert_eq!(
+                    proof.jws,
+                    "eyJhbGciOiJFUzI1NksiLCJiNjQiOmZhbHNlLCJjcml0IjpbImI2NCJdfQ..Qc-NyzQu2v735_qPR72j1oqUDK1Ne4XQ7Lc66_x9tlMSeI9xmrgguEA8UmQyTM0cd13xkvpK4g-NEWJBp8_d_w"
+                );
                 assert_eq!(proof.proof_purpose, "authentication");
                 assert_eq!(proof.r#type, "EcdsaSecp256k1Signature2019");
                 assert_eq!(
@@ -249,20 +230,17 @@ pub mod tests {
 
         let vc = match CredentialSigner::sign(
             &model,
-            &CredentialSignerSuite {
-                did: Some("did:nodex:test:000000000000000000000000000000".to_string()),
-                key_id: Some("signingKey".to_string()),
-                context: context.clone(),
+            CredentialSignerSuite {
+                did: "did:nodex:test:000000000000000000000000000000",
+                key_id: "signingKey",
+                context: &context,
             },
         ) {
             Ok(v) => v,
             Err(_) => panic!(),
         };
 
-        let (verified_model, verified) = match CredentialSigner::verify(
-            vc,
-            &CredentialSignerSuite { did: None, key_id: None, context },
-        ) {
+        let (verified_model, verified) = match CredentialSigner::verify(vc, &context) {
             Ok(v) => v,
             Err(_) => panic!(),
         };

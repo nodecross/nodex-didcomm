@@ -142,7 +142,9 @@ pub mod tests {
 
     #[fixture]
     fn signature() -> String {
-        String::from("eyJhbGciOiJFUzI1NksiLCJiNjQiOmZhbHNlLCJjcml0IjpbImI2NCJdfQ..vuhCrs1zs9Mlhof0TXgN9XQEY9ZJ2g2kZsH4Ef99wn5MR0pQOhkAHvgYZfHBvXOR795WnWKF_rUiE85abp5CAA")
+        String::from(
+            "eyJhbGciOiJFUzI1NksiLCJiNjQiOmZhbHNlLCJjcml0IjpbImI2NCJdfQ..vuhCrs1zs9Mlhof0TXgN9XQEY9ZJ2g2kZsH4Ef99wn5MR0pQOhkAHvgYZfHBvXOR795WnWKF_rUiE85abp5CAA",
+        )
     }
 
     #[test]

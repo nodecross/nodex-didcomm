@@ -304,26 +304,27 @@ impl OperationPayloadBuilder {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::nodex::keyring;
+    use crate::nodex::{extension::trng::OSRandomNumberGenerator, keyring};
 
     use super::*;
 
     #[test]
     pub fn test_did_create_payload() {
-        let keyring = match keyring::keypair::KeyPairing::create_keyring() {
+        let trng: OSRandomNumberGenerator = OSRandomNumberGenerator::default();
+        let keyring = match keyring::keypair::KeyPairing::create_keyring(trng) {
             Ok(v) => v,
             Err(_) => panic!(),
         };
 
-        let public = match keyring.get_sign_key_pair().to_public_key("key_id", &[""]) {
+        let public = match keyring.sign.to_public_key("key_id", &[""]) {
             Ok(v) => v,
             Err(_) => panic!(),
         };
-        let update = match keyring.get_recovery_key_pair().to_jwk(false) {
+        let update = match keyring.recovery.to_jwk(false) {
             Ok(v) => v,
             Err(_) => panic!(),
         };
-        let recovery = match keyring.get_update_key_pair().to_jwk(false) {
+        let recovery = match keyring.update.to_jwk(false) {
             Ok(v) => v,
             Err(_) => panic!(),
         };
