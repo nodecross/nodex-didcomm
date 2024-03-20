@@ -1,11 +1,10 @@
 use hmac::digest::generic_array::GenericArray;
-use k256::elliptic_curve::ecdh::diffie_hellman;
 use k256::{
     ecdsa::{
         signature::{Signer, Verifier},
         Signature, SigningKey, VerifyingKey,
     },
-    elliptic_curve::sec1::ToEncodedPoint,
+    elliptic_curve::{ecdh::diffie_hellman, sec1::ToEncodedPoint},
     PublicKey, SecretKey,
 };
 use thiserror::Error;
