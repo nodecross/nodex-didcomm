@@ -35,8 +35,6 @@ pub struct DIDCommEncryptedService {
 
 #[derive(Debug, Error)]
 pub enum DIDCommEncryptedServiceGenerateError {
-    #[error("key pairing error")]
-    KeyParingError(#[from] keyring::keypair::KeyPairingError),
     #[error("Secp256k1 error")]
     KeyringSecp256k1Error(#[from] keyring::secp256k1::Secp256k1Error),
     #[error("Secp256k1 error")]
@@ -47,12 +45,14 @@ pub enum DIDCommEncryptedServiceGenerateError {
     DidPublicKeyNotFound(String),
     #[error("something went wrong with vc service")]
     VCServiceError(#[from] DIDVCServiceGenerateError),
+    #[error("failed to encrypt message")]
+    EncryptFailed(#[from] didcomm_rs::Error),
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
 
 #[derive(Debug, Error)]
-pub enum DIDCommEncryptedServiceError {
+pub enum DIDCommEncryptedServiceVerifyError {
     #[error("key pairing error")]
     KeyParingError(#[from] keyring::keypair::KeyPairingError),
     #[error("Secp256k1 error")]
@@ -147,15 +147,13 @@ impl DIDCommEncryptedService {
             )
         }
 
-        let seal_signed_message = message
-            .as_jwe(&CryptoAlgorithm::XC20P, Some(pk.as_bytes().to_vec()))
-            .seal_signed(
+        let seal_signed_message =
+            message.as_jwe(&CryptoAlgorithm::XC20P, Some(pk.as_bytes().to_vec())).seal_signed(
                 sk.to_bytes().as_ref(),
                 Some(vec![Some(pk.as_bytes().to_vec())]),
                 SignatureAlgorithm::Es256k,
                 &from_keyring.sign.get_secret_key(),
-            )
-            .map_err(|e| anyhow::anyhow!("failed to encrypt message : {:?}", e))?;
+            )?;
 
         Ok(serde_json::from_str::<DIDCommMessage>(&seal_signed_message)
             .context("failed to convert to json")?)
@@ -165,7 +163,7 @@ impl DIDCommEncryptedService {
         &self,
         my_keyring: &KeyPairing,
         message: &Value,
-    ) -> Result<VerifiedContainer, DIDCommEncryptedServiceError> {
+    ) -> Result<VerifiedContainer, DIDCommEncryptedServiceVerifyError> {
         let protected = message
             .get("protected")
             .context("protected not found")?
@@ -187,7 +185,7 @@ impl DIDCommEncryptedService {
             .did_repository
             .find_identifier(other_did)
             .await?
-            .ok_or(DIDCommEncryptedServiceError::DIDNotFound(other_did.to_string()))?;
+            .ok_or(DIDCommEncryptedServiceVerifyError::DIDNotFound(other_did.to_string()))?;
 
         let public_keys = did_document.did_document.public_key.with_context(|| {
             format!("public_key is not found in did_document. did = {}", other_did)

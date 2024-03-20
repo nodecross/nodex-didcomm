@@ -18,6 +18,12 @@ struct JWSHeader {
 pub struct Jws {}
 
 #[derive(Debug, Error)]
+pub enum JwsEncodeError {
+    #[error(transparent)]
+    SignerError(#[from] SignerError),
+}
+
+#[derive(Debug, Error)]
 pub enum JwsError {
     #[error(transparent)]
     SignerError(#[from] SignerError),
@@ -38,7 +44,7 @@ pub enum JwsError {
 }
 
 impl Jws {
-    pub fn encode(object: &Value, context: &Secp256k1) -> Result<String, JwsError> {
+    pub fn encode(object: &Value, context: &Secp256k1) -> Result<String, JwsEncodeError> {
         // NOTE: header
         let header =
             JWSHeader { alg: "ES256K".to_string(), b64: false, crit: vec!["b64".to_string()] };
