@@ -24,7 +24,7 @@ pub enum JwsEncodeError {
 }
 
 #[derive(Debug, Error)]
-pub enum JwsError {
+pub enum JwsDecodeError {
     #[error(transparent)]
     SignerError(#[from] SignerError),
     #[error("InvalidJws : {0}")]
@@ -69,11 +69,11 @@ impl Jws {
         Ok([header, "".to_string(), signature].join("."))
     }
 
-    pub fn verify(object: &Value, jws: &str, context: &Secp256k1) -> Result<bool, JwsError> {
+    pub fn verify(object: &Value, jws: &str, context: &Secp256k1) -> Result<bool, JwsDecodeError> {
         let split: Vec<String> = jws.split('.').map(|v| v.to_string()).collect();
 
         if split.len() != 3 {
-            return Err(JwsError::InvalidJws(jws.to_string()));
+            return Err(JwsDecodeError::InvalidJws(jws.to_string()));
         }
 
         let _header = split[0].clone();
@@ -86,18 +86,18 @@ impl Jws {
         let header = serde_json::from_str::<JWSHeader>(&decoded)?;
 
         if header.alg != *"ES256K" {
-            return Err(JwsError::InvalidAlgorithm(header.alg));
+            return Err(JwsDecodeError::InvalidAlgorithm(header.alg));
         }
         if header.b64 {
-            return Err(JwsError::B64NotSupported);
+            return Err(JwsDecodeError::B64NotSupported);
         }
         if header.crit.iter().all(|v| v != "b64") {
-            return Err(JwsError::B64NotSupportedButContained);
+            return Err(JwsDecodeError::B64NotSupportedButContained);
         };
 
         // NOTE: payload
         if __payload != *"".to_string() {
-            return Err(JwsError::EmptyPayload);
+            return Err(JwsDecodeError::EmptyPayload);
         }
         let _payload = runtime::base64_url::Base64Url::encode(
             object.to_string().as_bytes(),

@@ -1,4 +1,4 @@
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use thiserror::Error;
@@ -56,7 +56,7 @@ pub enum CredentialSignerSignError {
 #[derive(Debug, Error)]
 pub enum CredentialSignerVerifyError {
     #[error("jws error: {0:?}")]
-    JwsError(#[from] super::jws::JwsError),
+    JwsError(#[from] super::jws::JwsDecodeError),
     #[error("json parse error: {0:?}")]
     JsonParseError(#[from] serde_json::Error),
     #[error("proof not found")]
@@ -66,19 +66,11 @@ pub enum CredentialSignerVerifyError {
 pub struct CredentialSigner {}
 
 impl CredentialSigner {
-    #[allow(dead_code)]
-    const PROOF_KEY: &'static str = "proof";
-
     pub fn sign(
         object: &GeneralVcDataModel,
         suite: CredentialSignerSuite,
+        created: DateTime<Utc>,
     ) -> Result<GeneralVcDataModel, CredentialSignerSignError> {
-        // FIXME:
-        // if (Object.keys(object).indexOf(this.PROOF_KEY) !== -1) {
-        //     throw new Error()
-        // }
-
-        let created = Utc::now().to_rfc3339();
         let jws = Jws::encode(&json!(object), suite.context)?;
 
         let did = suite.did;
@@ -88,7 +80,7 @@ impl CredentialSigner {
             proof: Some(Proof {
                 r#type: "EcdsaSecp256k1Signature2019".to_string(),
                 proof_purpose: "authentication".to_string(),
-                created,
+                created: created.to_rfc3339(),
                 verification_method: format!("{}#{}", did, key_id),
                 jws,
                 domain: None,
@@ -114,7 +106,6 @@ impl CredentialSigner {
         let jws = proof.jws;
         let payload = serde_json::to_value(&object)?;
 
-        // NOTE: verify
         let verified = Jws::verify(&payload, &jws, context)?;
 
         Ok((object, verified))
@@ -168,6 +159,7 @@ pub mod tests {
                 key_id: "signingKey",
                 context: &context,
             },
+            Utc::now(),
         )
         .unwrap();
 
@@ -214,6 +206,7 @@ pub mod tests {
                 key_id: "signingKey",
                 context: &context,
             },
+            Utc::now(),
         )
         .unwrap();
 

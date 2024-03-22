@@ -57,14 +57,13 @@ impl DIDVCService {
     ) -> Result<GeneralVcDataModel, DIDVCServiceGenerateError> {
         let r#type = "VerifiableCredential".to_string();
         let context = "https://www.w3.org/2018/credentials/v1".to_string();
-        let issuance_date = issuance_date.to_rfc3339();
 
         let model = GeneralVcDataModel {
             id: None,
             issuer: Issuer { id: from_did.to_string() },
             r#type: vec![r#type],
             context: vec![context],
-            issuance_date,
+            issuance_date: issuance_date.to_rfc3339(),
             credential_subject: CredentialSubject { id: None, container: message.clone() },
             expiration_date: None,
             proof: None,
@@ -77,6 +76,7 @@ impl DIDVCService {
                 key_id: "signingKey",
                 context: &from_keyring.sign,
             },
+            issuance_date,
         )?;
 
         Ok(signed)
