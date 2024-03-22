@@ -39,7 +39,6 @@ x25519-dalek = { version = "1.1.1" }
 
 [dev-dependencies]
 actix-rt = { version = "2.7.0" }
-rstest = { version = "0.17.0" }
 rand = { version = "0.8.5" }
 # request isn't used in this library, but it needs to be compiled.
 # to avoid this problem, fix the dependency tree.
