@@ -106,8 +106,7 @@ impl DIDVCService {
         let context = keyring::secp256k1::Secp256k1::from_jwk(&public_key.public_key_jwk)
             .context("failed to convert key")?;
 
-        let (verified_model, verified) =
-            CredentialSigner::verify(model, &context).context("failed to verify credential")?;
+        let (verified_model, verified) = CredentialSigner::verify(model, &context)?;
 
         if verified {
             Ok(verified_model)
@@ -151,5 +150,173 @@ mod tests {
 
         assert_eq!(verified.issuer.id, from_did);
         assert_eq!(verified.credential_subject.container, message);
+    }
+
+    mod generate_failed {
+        use super::*;
+        use crate::nodex::keyring::secp256k1::Secp256k1;
+
+        #[actix_rt::test]
+        async fn test_generate_sign_failed() {
+            let from_did = create_random_did();
+
+            let trng = OSRandomNumberGenerator::default();
+            let mut illegal_keyring = KeyPairing::create_keyring(&trng).unwrap();
+            illegal_keyring.sign = Secp256k1::new(
+                illegal_keyring.sign.get_public_key(),
+                vec![0; illegal_keyring.sign.get_secret_key().len()],
+            )
+            .unwrap();
+
+            let mock_repository = MockDidRepository::new(BTreeMap::new());
+
+            let service = DIDVCService::new(mock_repository);
+
+            let message = json!({"test": "0123456789abcdef"});
+            let issuance_date = Utc::now();
+
+            let res =
+                service.generate(&from_did, &illegal_keyring, &message, issuance_date).unwrap_err();
+
+            assert!(matches!(res, DIDVCServiceGenerateError::SignFailed(_)));
+        }
+    }
+
+    mod verify_failed {
+        use crate::repository::did_repository::mocks::{
+            IllegalPublicKeyLengthDidRepository, NoPublicKeyDidRepository,
+        };
+
+        use super::*;
+
+        fn create_did_vc(
+            from_did: &str,
+            from_keyring: &KeyPairing,
+            message: &Value,
+            issuance_date: DateTime<Utc>,
+        ) -> GeneralVcDataModel {
+            let service = DIDVCService::new(MockDidRepository::new(BTreeMap::new()));
+
+            service.generate(from_did, from_keyring, message, issuance_date).unwrap()
+        }
+
+        #[actix_rt::test]
+        async fn test_did_not_found() {
+            let from_did = create_random_did();
+
+            let mock_repository = MockDidRepository::new(BTreeMap::new());
+
+            let service = DIDVCService::new(mock_repository);
+
+            let model = create_did_vc(
+                &from_did,
+                &KeyPairing::create_keyring(&OSRandomNumberGenerator::default()).unwrap(),
+                &json!({}),
+                Utc::now(),
+            );
+
+            let res = service.verify(model).await.unwrap_err();
+
+            if let DIDVCServiceVerifyError::DIDNotFound(_) = res {
+            } else {
+                panic!("unexpected error: {:?}", res);
+            }
+        }
+
+        #[actix_rt::test]
+        async fn test_public_key_not_found() {
+            let from_did = create_random_did();
+
+            let model = create_did_vc(
+                &from_did,
+                &KeyPairing::create_keyring(&OSRandomNumberGenerator::default()).unwrap(),
+                &json!({}),
+                Utc::now(),
+            );
+
+            let mock_repository = NoPublicKeyDidRepository;
+            let service = DIDVCService::new(mock_repository);
+
+            let res = service.verify(model).await.unwrap_err();
+
+            if let DIDVCServiceVerifyError::PublicKeyNotFound(_) = res {
+            } else {
+                panic!("unexpected error: {:?}", res);
+            }
+        }
+
+        #[actix_rt::test]
+        async fn test_verify_failed() {
+            let from_did = create_random_did();
+
+            let mut model = create_did_vc(
+                &from_did,
+                &KeyPairing::create_keyring(&OSRandomNumberGenerator::default()).unwrap(),
+                &json!({}),
+                Utc::now(),
+            );
+            // for failing credential signer
+            model.proof = None;
+
+            let mock_repository = MockDidRepository::new(BTreeMap::from_iter([(
+                from_did.clone(),
+                KeyPairing::create_keyring(&OSRandomNumberGenerator::default()).unwrap(),
+            )]));
+            let service = DIDVCService::new(mock_repository);
+
+            let res = service.verify(model).await.unwrap_err();
+
+            if let DIDVCServiceVerifyError::VerifyFailed(_) = res {
+            } else {
+                panic!("unexpected error: {:?}", res);
+            }
+        }
+
+        #[actix_rt::test]
+        async fn test_public_key_length_mismatch() {
+            let from_did = create_random_did();
+
+            let model = create_did_vc(
+                &from_did,
+                &KeyPairing::create_keyring(&OSRandomNumberGenerator::default()).unwrap(),
+                &json!({}),
+                Utc::now(),
+            );
+
+            let mock_repository = IllegalPublicKeyLengthDidRepository;
+            let service = DIDVCService::new(mock_repository);
+
+            let res = service.verify(model).await.unwrap_err();
+
+            if let DIDVCServiceVerifyError::PublicKeyLengthMismatch = res {
+            } else {
+                panic!("unexpected error: {:?}", res);
+            }
+        }
+
+        #[actix_rt::test]
+        async fn test_signature_not_verified() {
+            let from_did = create_random_did();
+
+            let model = create_did_vc(
+                &from_did,
+                &KeyPairing::create_keyring(&OSRandomNumberGenerator::default()).unwrap(),
+                &json!({}),
+                Utc::now(),
+            );
+
+            let mock_repository = MockDidRepository::new(BTreeMap::from_iter([(
+                from_did.clone(),
+                KeyPairing::create_keyring(&OSRandomNumberGenerator::default()).unwrap(),
+            )]));
+            let service = DIDVCService::new(mock_repository);
+
+            let res = service.verify(model).await.unwrap_err();
+
+            if let DIDVCServiceVerifyError::SignatureNotVerified = res {
+            } else {
+                panic!("unexpected error: {:?}", res);
+            }
+        }
     }
 }

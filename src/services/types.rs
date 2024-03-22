@@ -6,7 +6,7 @@ use crate::nodex::{
     schema::general::{GeneralVcDataModel, Issuer},
 };
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct VerifiedContainer {
     pub message: GeneralVcDataModel,
     pub metadata: Option<Value>,

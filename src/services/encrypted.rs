@@ -11,7 +11,7 @@ use thiserror::Error;
 use x25519_dalek::{PublicKey, StaticSecret};
 
 use super::{
-    did_vc::{DIDVCService, DIDVCServiceGenerateError, DIDVCServiceVerifyError},
+    did_vc::{DIDVCService, DIDVCServiceGenerateError},
     types::VerifiedContainer,
 };
 use crate::{
@@ -53,18 +53,14 @@ pub enum DIDCommEncryptedServiceGenerateError {
 
 #[derive(Debug, Error)]
 pub enum DIDCommEncryptedServiceVerifyError {
-    #[error("key pairing error")]
-    KeyParingError(#[from] keyring::keypair::KeyPairingError),
     #[error("Secp256k1 error")]
     KeyringSecp256k1Error(#[from] keyring::secp256k1::Secp256k1Error),
     #[error("Secp256k1 error")]
     RuntimeSecp256k1Error(#[from] runtime::secp256k1::Secp256k1Error),
     #[error("did not found : {0}")]
     DIDNotFound(String),
-    #[error("did public key not found")]
-    DidPublicKeyNotFound,
-    #[error("something went wrong with vc service")]
-    VCServiceError(#[from] DIDVCServiceVerifyError),
+    #[error("did public key not found : did = {0}")]
+    DidPublicKeyNotFound(String),
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
@@ -183,9 +179,8 @@ impl DIDCommEncryptedService {
             .await?
             .ok_or(DIDCommEncryptedServiceVerifyError::DIDNotFound(other_did.to_string()))?;
 
-        let public_keys = did_document.did_document.public_key.with_context(|| {
-            format!("public_key is not found in did_document. did = {}", other_did)
-        })?;
+        let public_keys = did_document.did_document.public_key.ok_or(
+            DIDCommEncryptedServiceVerifyError::DidPublicKeyNotFound(other_did.to_string()))?;
 
         // FIXME: workaround
         if public_keys.len() != 1 {
@@ -219,7 +214,6 @@ impl DIDCommEncryptedService {
         });
 
         let body = message
-            .clone()
             .get_body()
             .map_err(|e| anyhow::anyhow!("failed to get body : {:?}", e))?;
         let body =
@@ -281,5 +275,210 @@ mod tests {
 
         assert_eq!(verified.issuer.id, from_did);
         assert_eq!(verified.credential_subject.container, message);
+    }
+
+    mod generate_failed {
+        use crate::repository::did_repository::mocks::NoPublicKeyDidRepository;
+
+        use self::keyring::secp256k1::Secp256k1;
+
+        use super::*;
+
+        #[actix_rt::test]
+        async fn test_did_not_found() {
+            let from_did = create_random_did();
+            let to_did = create_random_did();
+
+            let trng = OSRandomNumberGenerator::default();
+            let from_keyring = KeyPairing::create_keyring(&trng).unwrap();
+
+            let repo = MockDidRepository::new(BTreeMap::from_iter([(
+                from_did.clone(),
+                from_keyring.clone(),
+            )]));
+
+            let service = DIDVCService::new(repo.clone());
+            let service = DIDCommEncryptedService::new(repo, service, None);
+
+            let message = json!({"test": "0123456789abcdef"});
+            let issuance_date = Utc::now();
+
+            let res = service
+                .generate(&from_did, &to_did, &from_keyring, &message, None, issuance_date)
+                .await.unwrap_err();
+
+            if let DIDCommEncryptedServiceGenerateError::DIDNotFound(did) = res {
+                assert_eq!(did, to_did);
+            } else {
+                panic!("unexpected result: {:?}", res);
+            }
+        }
+
+        #[actix_rt::test]
+        async fn test_did_public_key_not_found() {
+            let from_did = create_random_did();
+            let to_did = create_random_did();
+
+            let trng = OSRandomNumberGenerator::default();
+            let from_keyring = KeyPairing::create_keyring(&trng).unwrap();
+
+            let repo = NoPublicKeyDidRepository;
+
+            let service = DIDVCService::new(repo);
+            let service = DIDCommEncryptedService::new(repo, service, None);
+
+            let message = json!({"test": "0123456789abcdef"});
+            let issuance_date = Utc::now();
+
+            let res = service
+                .generate(&from_did, &to_did, &from_keyring, &message, None, issuance_date)
+                .await
+                .unwrap_err();
+
+            if let DIDCommEncryptedServiceGenerateError::DidPublicKeyNotFound(did) = res {
+                assert_eq!(did, to_did);
+            } else {
+                panic!("unexpected result: {:?}", res);
+            }
+        }
+
+        #[actix_rt::test]
+        async fn test_runtime_secp256k1_error() {
+            let from_did = create_random_did();
+            let to_did = create_random_did();
+
+            let trng = OSRandomNumberGenerator::default();
+            let to_keyring = KeyPairing::create_keyring(&trng).unwrap();
+            let mut from_keyring = KeyPairing::create_keyring(&trng).unwrap();
+            from_keyring.sign = Secp256k1::new(
+                from_keyring.sign.get_public_key(),
+                vec![0; from_keyring.sign.get_secret_key().len()],
+            )
+            .unwrap();
+
+            let repo = MockDidRepository::new(BTreeMap::from_iter([
+                (from_did.clone(), from_keyring.clone()),
+                (to_did.clone(), to_keyring.clone()),
+            ]));
+
+            let service = DIDVCService::new(NoPublicKeyDidRepository);
+            let service = DIDCommEncryptedService::new(repo, service, None);
+
+            let message = json!({"test": "0123456789abcdef"});
+            let issuance_date = Utc::now();
+
+            let res = service
+                .generate(&from_did, &to_did, &from_keyring, &message, None, issuance_date)
+                .await.unwrap_err();
+
+            if let DIDCommEncryptedServiceGenerateError::RuntimeSecp256k1Error(_) = res {
+            } else {
+                panic!("unexpected result: {:?}", res);
+            }
+        }
+    }
+
+    mod verify_failed {
+        use crate::repository::did_repository::mocks::NoPublicKeyDidRepository;
+
+        use super::*;
+
+        async fn create_didcomm(
+            from_did: &str,
+            to_did: &str,
+            from_keyring: &KeyPairing,
+            to_keyring: &KeyPairing,
+            message: &Value,
+            metadata: Option<&Value>,
+            issuance_date: DateTime<Utc>,
+        ) -> DIDCommMessage {
+            let repo = MockDidRepository::new(BTreeMap::from_iter([(
+                to_did.to_string(),
+                to_keyring.clone(),
+            )]));
+
+            let service = DIDVCService::new(repo.clone());
+            let service = DIDCommEncryptedService::new(repo, service, None);
+
+            service
+                .generate(from_did, to_did, from_keyring, message, metadata, issuance_date)
+                .await
+                .unwrap()
+        }
+
+        #[actix_rt::test]
+        async fn test_did_not_found() {
+            let from_did = create_random_did();
+            let to_did = create_random_did();
+
+            let trng = OSRandomNumberGenerator::default();
+            let from_keyring = KeyPairing::create_keyring(&trng).unwrap();
+            let to_keyring = KeyPairing::create_keyring(&trng).unwrap();
+
+            let message = json!({"test": "0123456789abcdef"});
+            let issuance_date = Utc::now();
+
+            let res = create_didcomm(
+                &from_did,
+                &to_did,
+                &from_keyring,
+                &to_keyring,
+                &message,
+                None,
+                issuance_date,
+            ).await;
+
+            let repo = MockDidRepository::new(BTreeMap::from_iter([(
+                to_did.clone(),
+                to_keyring.clone(),
+            )]));
+
+            let service = DIDVCService::new(repo.clone());
+            let service = DIDCommEncryptedService::new(repo, service, None);
+
+            let res = service.verify(&from_keyring, &res).await.unwrap_err();
+
+            if let DIDCommEncryptedServiceVerifyError::DIDNotFound(did) = res {
+                assert_eq!(did, from_did);
+            } else {
+                panic!("unexpected result: {:?}", res);
+            }
+        }
+
+        #[actix_rt::test]
+        async fn test_did_public_key_not_found() {
+            let from_did = create_random_did();
+            let to_did = create_random_did();
+
+            let trng = OSRandomNumberGenerator::default();
+            let from_keyring = KeyPairing::create_keyring(&trng).unwrap();
+            let to_keyring = KeyPairing::create_keyring(&trng).unwrap();
+
+            let message = json!({"test": "0123456789abcdef"});
+            let issuance_date = Utc::now();
+
+            let res = create_didcomm(
+                &from_did,
+                &to_did,
+                &from_keyring,
+                &to_keyring,
+                &message,
+                None,
+                issuance_date,
+            ).await;
+
+            let repo = NoPublicKeyDidRepository;
+
+            let service = DIDVCService::new(repo.clone());
+            let service = DIDCommEncryptedService::new(repo, service, None);
+
+            let res = service.verify(&from_keyring, &res).await.unwrap_err();
+
+            if let DIDCommEncryptedServiceVerifyError::DidPublicKeyNotFound(did) = res {
+                assert_eq!(did, from_did);
+            } else {
+                panic!("unexpected result: {:?}", res);
+            }
+        }
     }
 }

@@ -64,4 +64,62 @@ pub mod mocks {
             }
         }
     }
+
+    #[derive(Clone, Copy)]
+    pub struct NoPublicKeyDidRepository;
+
+    #[async_trait::async_trait]
+    impl DidRepository for NoPublicKeyDidRepository {
+        async fn create_identifier(&self) -> anyhow::Result<DIDResolutionResponse> {
+            unimplemented!()
+        }
+        async fn find_identifier(
+            &self,
+            did: &str,
+        ) -> anyhow::Result<Option<DIDResolutionResponse>> {
+            Ok(Some(DIDResolutionResponse {
+                context: "https://www.w3.org/ns/did-resolution/v1".to_string(),
+                did_document: DIDDocument {
+                    id: did.to_string(),
+                    public_key: None,
+                    service: None,
+                    authentication: None,
+                },
+                method_metadata: MethodMetadata {
+                    published: true,
+                    recovery_commitment: None,
+                    update_commitment: None,
+                },
+            }))
+        }
+    }
+
+    #[derive(Clone, Copy)]
+    pub struct IllegalPublicKeyLengthDidRepository;
+
+    #[async_trait::async_trait]
+    impl DidRepository for IllegalPublicKeyLengthDidRepository {
+        async fn create_identifier(&self) -> anyhow::Result<DIDResolutionResponse> {
+            unimplemented!()
+        }
+        async fn find_identifier(
+            &self,
+            did: &str,
+        ) -> anyhow::Result<Option<DIDResolutionResponse>> {
+            Ok(Some(DIDResolutionResponse {
+                context: "https://www.w3.org/ns/did-resolution/v1".to_string(),
+                did_document: DIDDocument {
+                    id: did.to_string(),
+                    public_key: Some(vec![]),
+                    service: None,
+                    authentication: None,
+                },
+                method_metadata: MethodMetadata {
+                    published: true,
+                    recovery_commitment: None,
+                    update_commitment: None,
+                },
+            }))
+        }
+    }
 }
