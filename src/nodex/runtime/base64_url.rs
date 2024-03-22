@@ -51,11 +51,8 @@ impl Base64Url {
 
 #[cfg(test)]
 mod tests {
-    use rstest::*;
-
     use super::*;
 
-    #[fixture]
     fn message() -> String {
         String::from("0123456789abcdef")
     }
@@ -77,10 +74,7 @@ mod tests {
     #[test]
     fn test_base64url_decode_byte() {
         let encoded = Base64Url::encode(message().as_bytes(), &PaddingType::Padding);
-        let result = match Base64Url::decode_as_bytes(&encoded, &PaddingType::Padding) {
-            Ok(v) => v,
-            Err(_) => panic!(),
-        };
+        let result = Base64Url::decode_as_bytes(&encoded, &PaddingType::Padding).unwrap();
 
         assert_eq!(
             result,
@@ -94,10 +88,7 @@ mod tests {
     #[test]
     fn test_base64url_decode_byte_nopad() {
         let encoded = Base64Url::encode(message().as_bytes(), &PaddingType::NoPadding);
-        let result = match Base64Url::decode_as_bytes(&encoded, &PaddingType::NoPadding) {
-            Ok(v) => v,
-            Err(_) => panic!(),
-        };
+        let result = Base64Url::decode_as_bytes(&encoded, &PaddingType::NoPadding).unwrap();
 
         assert_eq!(
             result,
@@ -111,10 +102,7 @@ mod tests {
     #[test]
     fn test_base64url_decode_string() {
         let encoded = Base64Url::encode(message().as_bytes(), &PaddingType::Padding);
-        let result = match Base64Url::decode_as_string(&encoded, &PaddingType::Padding) {
-            Ok(v) => v,
-            Err(_) => panic!(),
-        };
+        let result = Base64Url::decode_as_string(&encoded, &PaddingType::Padding).unwrap();
 
         assert_eq!(result, message());
     }
@@ -122,10 +110,7 @@ mod tests {
     #[test]
     fn test_base64url_decode_string_nopad() {
         let encoded = Base64Url::encode(message().as_bytes(), &PaddingType::NoPadding);
-        let result = match Base64Url::decode_as_string(&encoded, &PaddingType::NoPadding) {
-            Ok(v) => v,
-            Err(_) => panic!(),
-        };
+        let result = Base64Url::decode_as_string(&encoded, &PaddingType::NoPadding).unwrap();
 
         assert_eq!(result, message());
     }

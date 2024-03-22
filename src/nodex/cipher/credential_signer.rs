@@ -123,7 +123,6 @@ impl CredentialSigner {
 
 #[cfg(test)]
 pub mod tests {
-    use rstest::*;
 
     use super::*;
     use crate::nodex::{
@@ -131,35 +130,22 @@ pub mod tests {
         schema::general::{CredentialSubject, Issuer},
     };
 
-    #[fixture]
-    fn secret_key() -> Vec<u8> {
-        vec![
-            0xc7, 0x39, 0x80, 0x5a, 0xb0, 0x3d, 0xa6, 0x2d, 0xdb, 0xe0, 0x33, 0x90, 0xac, 0xdf,
-            0x76, 0x15, 0x64, 0x0a, 0xa6, 0xed, 0x31, 0xb8, 0xf1, 0x82, 0x43, 0xf0, 0x4a, 0x57,
-            0x2c, 0x52, 0x8e, 0xdb,
-        ]
-    }
+    const PRIVATE_KEY: [u8; 32] = [
+        0xc7, 0x39, 0x80, 0x5a, 0xb0, 0x3d, 0xa6, 0x2d, 0xdb, 0xe0, 0x33, 0x90, 0xac, 0xdf, 0x76,
+        0x15, 0x64, 0x0a, 0xa6, 0xed, 0x31, 0xb8, 0xf1, 0x82, 0x43, 0xf0, 0x4a, 0x57, 0x2c, 0x52,
+        0x8e, 0xdb,
+    ];
 
-    #[fixture]
-    fn public_key() -> Vec<u8> {
-        vec![
-            0x02, 0x70, 0x96, 0x45, 0x32, 0xf0, 0x83, 0xf4, 0x5f, 0xe8, 0xe8, 0xcc, 0xea, 0x96,
-            0xa2, 0x2f, 0x60, 0x18, 0xd4, 0x6a, 0x40, 0x6f, 0x58, 0x3a, 0xb2, 0x26, 0xb1, 0x92,
-            0x83, 0xaa, 0x60, 0x5c, 0x44,
-        ]
-    }
-
-    // #[fixture]
-    // fn message() -> String {
-    //     String::from(r#"{"k":"0123456789abcdef"}"#)
-    // }
+    const PUBLIC_KEY: [u8; 33] = [
+        0x02, 0x70, 0x96, 0x45, 0x32, 0xf0, 0x83, 0xf4, 0x5f, 0xe8, 0xe8, 0xcc, 0xea, 0x96, 0xa2,
+        0x2f, 0x60, 0x18, 0xd4, 0x6a, 0x40, 0x6f, 0x58, 0x3a, 0xb2, 0x26, 0xb1, 0x92, 0x83, 0xaa,
+        0x60, 0x5c, 0x44,
+    ];
 
     #[test]
     pub fn test_sign() {
-        let context = match keyring::secp256k1::Secp256k1::new(public_key(), secret_key()) {
-            Ok(v) => v,
-            Err(_) => panic!(),
-        };
+        let context =
+            keyring::secp256k1::Secp256k1::new(PUBLIC_KEY.to_vec(), PRIVATE_KEY.to_vec()).unwrap();
 
         let model = GeneralVcDataModel {
             id: None,
@@ -175,17 +161,15 @@ pub mod tests {
             proof: None,
         };
 
-        let result = match CredentialSigner::sign(
+        let result = CredentialSigner::sign(
             &model,
             CredentialSignerSuite {
                 did: "did:nodex:test:000000000000000000000000000000",
                 key_id: "signingKey",
                 context: &context,
             },
-        ) {
-            Ok(v) => v,
-            Err(_) => panic!(),
-        };
+        )
+        .unwrap();
 
         match result.proof {
             Some(proof) => {
@@ -206,10 +190,8 @@ pub mod tests {
 
     #[test]
     pub fn test_verify() {
-        let context = match keyring::secp256k1::Secp256k1::new(public_key(), secret_key()) {
-            Ok(v) => v,
-            Err(_) => panic!(),
-        };
+        let context =
+            keyring::secp256k1::Secp256k1::new(PUBLIC_KEY.to_vec(), PRIVATE_KEY.to_vec()).unwrap();
 
         let model = GeneralVcDataModel {
             id: None,
@@ -225,22 +207,17 @@ pub mod tests {
             proof: None,
         };
 
-        let vc = match CredentialSigner::sign(
+        let vc = CredentialSigner::sign(
             &model,
             CredentialSignerSuite {
                 did: "did:nodex:test:000000000000000000000000000000",
                 key_id: "signingKey",
                 context: &context,
             },
-        ) {
-            Ok(v) => v,
-            Err(_) => panic!(),
-        };
+        )
+        .unwrap();
 
-        let (verified_model, verified) = match CredentialSigner::verify(vc, &context) {
-            Ok(v) => v,
-            Err(_) => panic!(),
-        };
+        let (verified_model, verified) = CredentialSigner::verify(vc, &context).unwrap();
 
         assert!(verified);
         assert_eq!(model, verified_model);

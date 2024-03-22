@@ -22,11 +22,14 @@ pub enum Secp256k1Error {
 }
 
 impl Secp256k1 {
-    pub fn ecdh(private_key: &[u8], public_key: &[u8]) -> Result<Vec<u8>, Secp256k1Error> {
+    pub fn ecdh(private_key: &[u8], public_key: &[u8]) -> Result<[u8; 32], Secp256k1Error> {
         let sk = SecretKey::from_be_bytes(private_key)?;
         let pk = PublicKey::from_sec1_bytes(public_key)?;
 
-        Ok(diffie_hellman(sk.to_nonzero_scalar(), pk.as_affine()).as_bytes().to_vec())
+        let shared = diffie_hellman(sk.to_nonzero_scalar(), pk.as_affine());
+        let converted: [u8; 32] = (*shared.as_bytes()).into();
+
+        Ok(converted)
     }
 
     pub fn generate_public_key(private_key: &[u8]) -> Result<Vec<u8>, Secp256k1Error> {
@@ -79,120 +82,65 @@ impl Secp256k1 {
 
 #[cfg(test)]
 mod tests {
-    use rstest::*;
-
     use super::*;
 
-    #[fixture]
     fn message() -> String {
         String::from("0123456789abcdef")
     }
 
-    #[fixture]
-    fn private_key() -> Vec<u8> {
-        vec![
-            0x03, 0xb4, 0xad, 0xcd, 0x59, 0x36, 0x3f, 0x4e, 0xb9, 0xd0, 0x9f, 0x2a, 0x34, 0xcd,
-            0x3d, 0x26, 0xa8, 0x12, 0x33, 0x0c, 0x2f, 0x88, 0x7c, 0xe5, 0xf8, 0x53, 0x89, 0x48,
-            0xff, 0xac, 0x74, 0xc0,
-        ]
-    }
+    const PRIVATE_KEY: [u8; 32] = [
+        0x03, 0xb4, 0xad, 0xcd, 0x59, 0x36, 0x3f, 0x4e, 0xb9, 0xd0, 0x9f, 0x2a, 0x34, 0xcd, 0x3d,
+        0x26, 0xa8, 0x12, 0x33, 0x0c, 0x2f, 0x88, 0x7c, 0xe5, 0xf8, 0x53, 0x89, 0x48, 0xff, 0xac,
+        0x74, 0xc0,
+    ];
+
+    const PUBLIC_KEY: [u8; 33] = [
+        0x02, 0x51, 0x84, 0x22, 0x3f, 0xe8, 0x5d, 0x53, 0x20, 0x3c, 0xf9, 0xd3, 0x7f, 0x68, 0x22,
+        0xe6, 0x33, 0xe8, 0xd7, 0x9f, 0x48, 0xb1, 0x32, 0xdf, 0x0b, 0x8c, 0x8a, 0x64, 0x11, 0x41,
+        0xf3, 0x19, 0xb6,
+    ];
+
+    const UNCOMPRESSED_PUBLIC_KEY: [u8; 65] = [
+        0x04, 0x51, 0x84, 0x22, 0x3f, 0xe8, 0x5d, 0x53, 0x20, 0x3c, 0xf9, 0xd3, 0x7f, 0x68, 0x22,
+        0xe6, 0x33, 0xe8, 0xd7, 0x9f, 0x48, 0xb1, 0x32, 0xdf, 0x0b, 0x8c, 0x8a, 0x64, 0x11, 0x41,
+        0xf3, 0x19, 0xb6, 0xa3, 0x70, 0x7c, 0xa5, 0x18, 0x61, 0xe1, 0xe2, 0xde, 0xa4, 0x3c, 0x23,
+        0x84, 0xf1, 0x79, 0xed, 0x44, 0xe9, 0x8c, 0x4a, 0xd0, 0x38, 0x89, 0x21, 0xd9, 0x6a, 0x1e,
+        0x05, 0x93, 0x15, 0xe7, 0x54,
+    ];
 
     #[test]
     fn test() {
-        let shared_1 = match Secp256k1::ecdh(
-            &private_key(),
-            &[
-                0x02, 0x51, 0x84, 0x22, 0x3f, 0xe8, 0x5d, 0x53, 0x20, 0x3c, 0xf9, 0xd3, 0x7f, 0x68,
-                0x22, 0xe6, 0x33, 0xe8, 0xd7, 0x9f, 0x48, 0xb1, 0x32, 0xdf, 0x0b, 0x8c, 0x8a, 0x64,
-                0x11, 0x41, 0xf3, 0x19, 0xb6,
-            ],
-        ) {
-            Ok(v) => v,
-            Err(_) => panic!(),
-        };
+        let shared_1 = Secp256k1::ecdh(&PRIVATE_KEY, &PUBLIC_KEY).unwrap();
 
-        let shared_2 = match Secp256k1::ecdh(
-            &private_key(),
-            &[
-                0x04, 0x51, 0x84, 0x22, 0x3f, 0xe8, 0x5d, 0x53, 0x20, 0x3c, 0xf9, 0xd3, 0x7f, 0x68,
-                0x22, 0xe6, 0x33, 0xe8, 0xd7, 0x9f, 0x48, 0xb1, 0x32, 0xdf, 0x0b, 0x8c, 0x8a, 0x64,
-                0x11, 0x41, 0xf3, 0x19, 0xb6, 0xa3, 0x70, 0x7c, 0xa5, 0x18, 0x61, 0xe1, 0xe2, 0xde,
-                0xa4, 0x3c, 0x23, 0x84, 0xf1, 0x79, 0xed, 0x44, 0xe9, 0x8c, 0x4a, 0xd0, 0x38, 0x89,
-                0x21, 0xd9, 0x6a, 0x1e, 0x05, 0x93, 0x15, 0xe7, 0x54,
-            ],
-        ) {
-            Ok(v) => v,
-            Err(_) => panic!(),
-        };
+        let shared_2 = Secp256k1::ecdh(&PRIVATE_KEY, &UNCOMPRESSED_PUBLIC_KEY).unwrap();
 
         assert_eq!(shared_1.len(), 32);
-        assert_eq!(shared_2.len(), 32);
         assert_eq!(shared_1, shared_2);
     }
 
     #[test]
     fn test_generate_public_key() {
-        let result = match Secp256k1::generate_public_key(&private_key()) {
-            Ok(v) => v,
-            Err(_) => panic!(),
-        };
+        let result = Secp256k1::generate_public_key(&PRIVATE_KEY).unwrap();
 
-        assert_eq!(
-            result,
-            vec![
-                0x02, 0x51, 0x84, 0x22, 0x3f, 0xe8, 0x5d, 0x53, 0x20, 0x3c, 0xf9, 0xd3, 0x7f, 0x68,
-                0x22, 0xe6, 0x33, 0xe8, 0xd7, 0x9f, 0x48, 0xb1, 0x32, 0xdf, 0x0b, 0x8c, 0x8a, 0x64,
-                0x11, 0x41, 0xf3, 0x19, 0xb6,
-            ]
-        );
+        assert_eq!(result, &PUBLIC_KEY);
     }
 
     #[test]
     fn test_convert_public_key() {
-        let public_key = match Secp256k1::generate_public_key(&private_key()) {
-            Ok(v) => v,
-            Err(_) => panic!(),
-        };
+        let result_1 = Secp256k1::convert_public_key(&PUBLIC_KEY, true).unwrap();
 
-        let result_1 = match Secp256k1::convert_public_key(&public_key, true) {
-            Ok(v) => v,
-            Err(_) => panic!(),
-        };
+        assert_eq!(result_1, &PUBLIC_KEY);
 
-        assert_eq!(
-            result_1,
-            vec![
-                0x02, 0x51, 0x84, 0x22, 0x3f, 0xe8, 0x5d, 0x53, 0x20, 0x3c, 0xf9, 0xd3, 0x7f, 0x68,
-                0x22, 0xe6, 0x33, 0xe8, 0xd7, 0x9f, 0x48, 0xb1, 0x32, 0xdf, 0x0b, 0x8c, 0x8a, 0x64,
-                0x11, 0x41, 0xf3, 0x19, 0xb6,
-            ]
-        );
+        let result_2 = Secp256k1::convert_public_key(&PUBLIC_KEY, false).unwrap();
 
-        let result_2 = match Secp256k1::convert_public_key(&public_key, false) {
-            Ok(v) => v,
-            Err(_) => panic!(),
-        };
-
-        assert_eq!(
-            result_2,
-            vec![
-                0x04, 0x51, 0x84, 0x22, 0x3f, 0xe8, 0x5d, 0x53, 0x20, 0x3c, 0xf9, 0xd3, 0x7f, 0x68,
-                0x22, 0xe6, 0x33, 0xe8, 0xd7, 0x9f, 0x48, 0xb1, 0x32, 0xdf, 0x0b, 0x8c, 0x8a, 0x64,
-                0x11, 0x41, 0xf3, 0x19, 0xb6, 0xa3, 0x70, 0x7c, 0xa5, 0x18, 0x61, 0xe1, 0xe2, 0xde,
-                0xa4, 0x3c, 0x23, 0x84, 0xf1, 0x79, 0xed, 0x44, 0xe9, 0x8c, 0x4a, 0xd0, 0x38, 0x89,
-                0x21, 0xd9, 0x6a, 0x1e, 0x05, 0x93, 0x15, 0xe7, 0x54,
-            ]
-        );
+        assert_eq!(result_2, &UNCOMPRESSED_PUBLIC_KEY);
     }
 
     #[test]
     fn test_ecdsa_sign() {
-        let message = String::from(&message()).as_bytes().to_vec();
+        let message = message().as_bytes().to_vec();
 
-        let result = match Secp256k1::ecdsa_sign(&message, &private_key()) {
-            Ok(v) => v,
-            Err(_) => panic!(),
-        };
+        let result = Secp256k1::ecdsa_sign(&message, &PRIVATE_KEY).unwrap();
 
         assert_eq!(
             result,
@@ -208,36 +156,16 @@ mod tests {
 
     #[test]
     fn test_ecdsa_verify() {
-        let message = String::from(&message()).as_bytes().to_vec();
+        let message = message().as_bytes().to_vec();
 
-        let signature = match Secp256k1::ecdsa_sign(&message, &private_key()) {
-            Ok(v) => v,
-            Err(_) => panic!(),
-        };
+        let signature = Secp256k1::ecdsa_sign(&message, &PRIVATE_KEY).unwrap();
 
-        let public_key_compressed = match Secp256k1::generate_public_key(&private_key()) {
-            Ok(v) => v,
-            Err(_) => panic!(),
-        };
-
-        let result_1 = match Secp256k1::ecdsa_verify(&signature, &message, &public_key_compressed) {
-            Ok(v) => v,
-            Err(_) => panic!(),
-        };
+        let result_1 = Secp256k1::ecdsa_verify(&signature, &message, &PUBLIC_KEY).unwrap();
 
         assert!(result_1);
 
-        let public_key_un_compressed =
-            match Secp256k1::convert_public_key(&public_key_compressed, false) {
-                Ok(v) => v,
-                Err(_) => panic!(),
-            };
-
         let result_2 =
-            match Secp256k1::ecdsa_verify(&signature, &message, &public_key_un_compressed) {
-                Ok(v) => v,
-                Err(_) => panic!(),
-            };
+            Secp256k1::ecdsa_verify(&signature, &message, &UNCOMPRESSED_PUBLIC_KEY).unwrap();
 
         assert!(result_2);
     }

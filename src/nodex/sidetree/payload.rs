@@ -313,31 +313,17 @@ pub mod tests {
     #[test]
     pub fn test_did_create_payload() {
         let trng: OSRandomNumberGenerator = OSRandomNumberGenerator::default();
-        let keyring = match keyring::keypair::KeyPairing::create_keyring(&trng) {
-            Ok(v) => v,
-            Err(_) => panic!(),
-        };
+        let keyring = keyring::keypair::KeyPairing::create_keyring(&trng).unwrap();
 
-        let public = match keyring.sign.to_public_key("key_id", &[""]) {
-            Ok(v) => v,
-            Err(_) => panic!(),
-        };
-        let update = match keyring.recovery.to_jwk(false) {
-            Ok(v) => v,
-            Err(_) => panic!(),
-        };
-        let recovery = match keyring.update.to_jwk(false) {
-            Ok(v) => v,
-            Err(_) => panic!(),
-        };
+        let public = keyring.sign.to_public_key("key_id", &[""]).unwrap();
+        let update = keyring.recovery.to_jwk(false).unwrap();
+        let recovery = keyring.update.to_jwk(false).unwrap();
 
-        let _result = match OperationPayloadBuilder::did_create_payload(&DIDCreateRequest {
+        let _result = OperationPayloadBuilder::did_create_payload(&DIDCreateRequest {
             public_keys: vec![public],
             commitment_keys: CommitmentKeys { recovery, update },
             service_endpoints: vec![],
-        }) {
-            Ok(v) => v,
-            Err(_) => panic!(),
-        };
+        })
+        .unwrap();
     }
 }

@@ -183,11 +183,10 @@ mod tests {
     }
 
     mod verify_failed {
+        use super::*;
         use crate::repository::did_repository::mocks::{
             IllegalPublicKeyLengthDidRepository, NoPublicKeyDidRepository,
         };
-
-        use super::*;
 
         fn create_did_vc(
             from_did: &str,

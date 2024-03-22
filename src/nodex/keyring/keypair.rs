@@ -6,7 +6,7 @@ use thiserror::Error;
 use super::secp256k1::{Secp256k1, Secp256k1Error, Secp256k1HexKeyPair};
 use crate::nodex::{extension::trng::Trng, runtime};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct KeyPairing {
     pub sign: Secp256k1,
     pub update: Secp256k1,
@@ -56,8 +56,7 @@ impl KeyPairing {
     ) -> Result<Secp256k1, KeyPairingError> {
         let node = runtime::bip32::BIP32::get_node(seed, derivation_path)?;
 
-        Secp256k1::new(node.public_key, node.private_key)
-            .map_err(KeyPairingError::KeyInitializationFailed)
+        Ok(Secp256k1::from_bip32(node)?)
     }
 }
 

@@ -22,21 +22,16 @@ impl Jcs {
 
 #[cfg(test)]
 pub mod tests {
-    use rstest::*;
 
     use super::*;
 
-    #[fixture]
     fn json() -> String {
         String::from(r#"{"c":2,"a":1,"b":[]}"#)
     }
 
     #[test]
     fn test_canonicalize() {
-        let result = match Jcs::canonicalize(&json()) {
-            Ok(v) => v,
-            Err(_) => panic!(),
-        };
+        let result = Jcs::canonicalize(&json()).unwrap();
 
         assert_eq!(result, r#"{"a":1,"b":[],"c":2}"#);
     }

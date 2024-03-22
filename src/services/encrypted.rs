@@ -180,7 +180,8 @@ impl DIDCommEncryptedService {
             .ok_or(DIDCommEncryptedServiceVerifyError::DIDNotFound(other_did.to_string()))?;
 
         let public_keys = did_document.did_document.public_key.ok_or(
-            DIDCommEncryptedServiceVerifyError::DidPublicKeyNotFound(other_did.to_string()))?;
+            DIDCommEncryptedServiceVerifyError::DidPublicKeyNotFound(other_did.to_string()),
+        )?;
 
         // FIXME: workaround
         if public_keys.len() != 1 {
@@ -213,9 +214,8 @@ impl DIDCommEncryptedService {
             None => false,
         });
 
-        let body = message
-            .get_body()
-            .map_err(|e| anyhow::anyhow!("failed to get body : {:?}", e))?;
+        let body =
+            message.get_body().map_err(|e| anyhow::anyhow!("failed to get body : {:?}", e))?;
         let body =
             serde_json::from_str::<GeneralVcDataModel>(&body).context("failed to parse body")?;
 
@@ -278,11 +278,9 @@ mod tests {
     }
 
     mod generate_failed {
-        use crate::repository::did_repository::mocks::NoPublicKeyDidRepository;
-
         use self::keyring::secp256k1::Secp256k1;
-
         use super::*;
+        use crate::repository::did_repository::mocks::NoPublicKeyDidRepository;
 
         #[actix_rt::test]
         async fn test_did_not_found() {
@@ -305,7 +303,8 @@ mod tests {
 
             let res = service
                 .generate(&from_did, &to_did, &from_keyring, &message, None, issuance_date)
-                .await.unwrap_err();
+                .await
+                .unwrap_err();
 
             if let DIDCommEncryptedServiceGenerateError::DIDNotFound(did) = res {
                 assert_eq!(did, to_did);
@@ -369,7 +368,8 @@ mod tests {
 
             let res = service
                 .generate(&from_did, &to_did, &from_keyring, &message, None, issuance_date)
-                .await.unwrap_err();
+                .await
+                .unwrap_err();
 
             if let DIDCommEncryptedServiceGenerateError::RuntimeSecp256k1Error(_) = res {
             } else {
@@ -379,9 +379,8 @@ mod tests {
     }
 
     mod verify_failed {
-        use crate::repository::did_repository::mocks::NoPublicKeyDidRepository;
-
         use super::*;
+        use crate::repository::did_repository::mocks::NoPublicKeyDidRepository;
 
         async fn create_didcomm(
             from_did: &str,
@@ -426,12 +425,11 @@ mod tests {
                 &message,
                 None,
                 issuance_date,
-            ).await;
+            )
+            .await;
 
-            let repo = MockDidRepository::new(BTreeMap::from_iter([(
-                to_did.clone(),
-                to_keyring.clone(),
-            )]));
+            let repo =
+                MockDidRepository::new(BTreeMap::from_iter([(to_did.clone(), to_keyring.clone())]));
 
             let service = DIDVCService::new(repo.clone());
             let service = DIDCommEncryptedService::new(repo, service, None);
@@ -465,11 +463,12 @@ mod tests {
                 &message,
                 None,
                 issuance_date,
-            ).await;
+            )
+            .await;
 
             let repo = NoPublicKeyDidRepository;
 
-            let service = DIDVCService::new(repo.clone());
+            let service = DIDVCService::new(repo);
             let service = DIDCommEncryptedService::new(repo, service, None);
 
             let res = service.verify(&from_keyring, &res).await.unwrap_err();

@@ -88,11 +88,9 @@ impl Multihash {
 
 #[cfg(test)]
 mod tests {
-    use rstest::*;
 
     use super::*;
 
-    #[fixture]
     fn message() -> String {
         String::from(r#"{"k":"0123456789abcdef"}"#)
     }
