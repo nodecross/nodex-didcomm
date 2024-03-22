@@ -2,7 +2,6 @@ use std::{cmp::Ordering, convert::TryFrom};
 
 use hex;
 use ibig::{ibig, IBig};
-
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
