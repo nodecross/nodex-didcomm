@@ -1,5 +1,5 @@
+pub(crate) mod common;
+pub mod did;
 pub mod didcomm;
-pub mod nodex;
-pub mod repository;
-pub mod services;
-pub mod types;
+pub mod keyring;
+pub mod verifiable_credentials;
