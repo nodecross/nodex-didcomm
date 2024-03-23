@@ -47,7 +47,7 @@ pub enum DIDCommEncryptedServiceGenerateError {
     #[error("failed to create identifier")]
     SidetreeCreateRequestFailed(#[from] CreateIdentifierError),
     #[error("failed to encrypt message")]
-    EncryptFailed(#[from] didcomm_rs::Error),
+    EncryptFailed(anyhow::Error),
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
@@ -152,7 +152,10 @@ impl DIDCommEncryptedService {
                 Some(vec![Some(pk.as_bytes().to_vec())]),
                 SignatureAlgorithm::Es256k,
                 &from_keyring.sign.get_secret_key(),
-            )?;
+            )
+            .map_err(|e| {
+                DIDCommEncryptedServiceGenerateError::EncryptFailed(anyhow::Error::msg(e.to_string()))
+            })?;
 
         Ok(serde_json::from_str::<DIDCommMessage>(&seal_signed_message)
             .context("failed to convert to json")?)
