@@ -146,15 +146,18 @@ impl DIDCommEncryptedService {
             )
         }
 
-        let seal_signed_message =
-            message.as_jwe(&CryptoAlgorithm::XC20P, Some(pk.as_bytes().to_vec())).seal_signed(
+        let seal_signed_message = message
+            .as_jwe(&CryptoAlgorithm::XC20P, Some(pk.as_bytes().to_vec()))
+            .seal_signed(
                 sk.to_bytes().as_ref(),
                 Some(vec![Some(pk.as_bytes().to_vec())]),
                 SignatureAlgorithm::Es256k,
                 &from_keyring.sign.get_secret_key(),
             )
             .map_err(|e| {
-                DIDCommEncryptedServiceGenerateError::EncryptFailed(anyhow::Error::msg(e.to_string()))
+                DIDCommEncryptedServiceGenerateError::EncryptFailed(anyhow::Error::msg(
+                    e.to_string(),
+                ))
             })?;
 
         Ok(serde_json::from_str::<DIDCommMessage>(&seal_signed_message)
