@@ -28,7 +28,7 @@ k256 = { version = "0.10.4", features = [
     "serde",
     "sha256",
 ] }
-libloading = { version = "0.7.4" }
+libloading = { version = "0.8.3" }
 log = { version = "0.4.0" }
 serde = { version = "1.0.131", features = ["derive"] }
 serde_jcs = { version = "0.1.0" }
