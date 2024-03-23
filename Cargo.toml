@@ -21,10 +21,9 @@ hdwallet = { version = "0.4.1" }
 hex = { version = "0.4.3" }
 hmac = { version = "0.12.1" }
 ibig = { version = "0.3.6" }
-k256 = { version = "0.10.4", features = [
+k256 = { version = "0.13.3", features = [
     "ecdh",
     "ecdsa",
-    "keccak256",
     "serde",
     "sha256",
 ] }
