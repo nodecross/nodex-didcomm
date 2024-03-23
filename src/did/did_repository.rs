@@ -57,6 +57,15 @@ pub struct DidRepositoryImpl<C: SidetreeHttpClient + Send + Sync> {
     client: C,
 }
 
+impl<C> Clone for DidRepositoryImpl<C>
+where
+    C: SidetreeHttpClient + Send + Sync + Clone,
+{
+    fn clone(&self) -> Self {
+        Self { client: self.client.clone() }
+    }
+}
+
 impl<C: SidetreeHttpClient + Send + Sync> DidRepositoryImpl<C> {
     pub fn new(client: C) -> Self {
         Self { client }
