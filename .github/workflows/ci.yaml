@@ -30,7 +30,10 @@ jobs:
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
 
-      - uses: dtolnay/rust-toolchain@nightly
+      - name: install rust nightly for rustfmt and clippy
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt, clippy
 
       - name: Install taplo
         uses: baptiste0928/cargo-install@v3
@@ -39,7 +42,7 @@ jobs:
 
       - name: Check format
         run: |
-          cargo fmt --all -- --check
+          cargo +nightly fmt --all -- --check
           cargo clippy --all-targets -- -D warnings
 
       - name: Check typos

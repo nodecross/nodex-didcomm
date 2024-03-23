@@ -3,12 +3,24 @@ indent_style = "Block"
 use_small_heuristics = "Max"
 version = "Two"
 
+# format target
+format_code_in_doc_comments = true
+format_strings = true
+wrap_comments = true
+
 # Simplification
+blank_lines_upper_bound = 1
+group_imports = "StdExternalCrate"
 merge_derives = true
+normalize_comments = true
 remove_nested_parens = true
 use_field_init_shorthand = true
 use_try_shorthand = true
 
 # Sort
+imports_granularity = "Crate"
 reorder_imports = true
 reorder_modules = true
+
+# Indentation
+enum_discrim_align_threshold = 10

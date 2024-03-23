@@ -2,10 +2,13 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use thiserror::Error;
 
-use crate::nodex::keyring::secp256k1::KeyPairSecp256K1;
-use crate::nodex::runtime::base64_url::Base64Url;
-use crate::nodex::runtime::base64_url::PaddingType;
-use crate::nodex::runtime::multihash::Multihash;
+use crate::nodex::{
+    keyring::secp256k1::KeyPairSecp256K1,
+    runtime::{
+        base64_url::{Base64Url, PaddingType},
+        multihash::Multihash,
+    },
+};
 
 pub struct OperationPayloadBuilder {}
 
@@ -152,8 +155,8 @@ struct DIDReplaceSuffixObject {
 // ACTION: ietf-json-patch
 #[allow(dead_code)]
 struct DIDIetfJsonPatchAction {
-    action: String, // 'replace',
-                    // patches: Vec<>
+    action: String, /* 'replace',
+                     * patches: Vec<> */
 }
 
 #[allow(dead_code)]
@@ -304,39 +307,23 @@ impl OperationPayloadBuilder {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::nodex::keyring;
-
     use super::*;
+    use crate::nodex::{extension::trng::OSRandomNumberGenerator, keyring};
 
     #[test]
     pub fn test_did_create_payload() {
-        let keyring = match keyring::keypair::KeyPairing::create_keyring() {
-            Ok(v) => v,
-            Err(_) => panic!(),
-        };
+        let trng: OSRandomNumberGenerator = OSRandomNumberGenerator::default();
+        let keyring = keyring::keypair::KeyPairing::create_keyring(&trng).unwrap();
 
-        let public = match keyring.get_sign_key_pair().to_public_key("key_id", &[""]) {
-            Ok(v) => v,
-            Err(_) => panic!(),
-        };
-        let update = match keyring.get_recovery_key_pair().to_jwk(false) {
-            Ok(v) => v,
-            Err(_) => panic!(),
-        };
-        let recovery = match keyring.get_update_key_pair().to_jwk(false) {
-            Ok(v) => v,
-            Err(_) => panic!(),
-        };
+        let public = keyring.sign.to_public_key("key_id", &[""]).unwrap();
+        let update = keyring.recovery.to_jwk(false).unwrap();
+        let recovery = keyring.update.to_jwk(false).unwrap();
 
-        let result = match OperationPayloadBuilder::did_create_payload(&DIDCreateRequest {
+        let _result = OperationPayloadBuilder::did_create_payload(&DIDCreateRequest {
             public_keys: vec![public],
             commitment_keys: CommitmentKeys { recovery, update },
             service_endpoints: vec![],
-        }) {
-            Ok(v) => v,
-            Err(_) => panic!(),
-        };
-
-        println!("{}", json!(&result));
+        })
+        .unwrap();
     }
 }

@@ -1,12 +1,11 @@
-use crate::{
-    config::{did::Extension, did_config},
-    nodex::runtime::random::{Random, RandomError},
-};
 use std::{ffi::CStr, num::NonZeroU32};
 
 use thiserror::Error;
 
-pub struct Trng {}
+use crate::{
+    nodex::runtime::random::{Random, RandomError},
+    types::Extension,
+};
 
 #[derive(Error, Debug)]
 pub enum TrngError {
@@ -20,29 +19,39 @@ pub enum TrngError {
     RandomGenerationFailed(#[from] RandomError),
 }
 
-impl Trng {
+pub trait Trng {
     const MAX_BUFFER_LENGTH: usize = 1024;
+    fn generate(&self, size: &usize) -> Result<Vec<u8>, TrngError>;
+}
 
-    pub fn new() -> Trng {
-        Trng {}
+#[derive(Default)]
+pub struct OSRandomNumberGenerator {}
+
+impl Trng for OSRandomNumberGenerator {
+    fn generate(&self, size: &usize) -> Result<Vec<u8>, TrngError> {
+        Random::bytes(size).map_err(TrngError::RandomGenerationFailed)
     }
+}
 
-    fn read_external(&self, extension: &Extension, size: &usize) -> Result<Vec<u8>, TrngError> {
-        log::info!("Called: read_external");
+pub struct ExternalTrng {
+    extension: Extension,
+}
 
-        if Trng::MAX_BUFFER_LENGTH < *size {
+impl Trng for ExternalTrng {
+    fn generate(&self, size: &usize) -> Result<Vec<u8>, TrngError> {
+        if Self::MAX_BUFFER_LENGTH < *size {
             return Err(TrngError::BufferLengthOver);
         }
 
         unsafe {
-            let buffer = [0u8; Trng::MAX_BUFFER_LENGTH + 1];
+            let buffer = [0u8; Self::MAX_BUFFER_LENGTH + 1];
             let buffer_ptr: *const i8 = buffer.as_ptr().cast();
 
-            let lib = libloading::Library::new(&extension.filename)?;
+            let lib = libloading::Library::new(&self.extension.filename)?;
 
             let func: libloading::Symbol<
                 unsafe extern "C" fn(buf: *const i8, bufsize: usize, size: usize) -> u32,
-            > = lib.get(extension.symbol.as_bytes())?;
+            > = lib.get(self.extension.symbol.as_bytes())?;
 
             let result = func(buffer_ptr, buffer.len(), *size);
 
@@ -51,23 +60,6 @@ impl Trng {
             }
 
             Ok(CStr::from_ptr(buffer_ptr as *const core::ffi::c_char).to_bytes().to_vec())
-        }
-    }
-
-    fn read_internal(&self, size: &usize) -> Result<Vec<u8>, TrngError> {
-        log::info!("Called: read_internal");
-
-        Random::bytes(size).map_err(TrngError::RandomGenerationFailed)
-    }
-
-    pub fn read(&self, size: &usize) -> Result<Vec<u8>, TrngError> {
-        let config = did_config();
-        let config = config.lock();
-
-        if let Some(ref extension) = config.load_trng_read_sig() {
-            self.read_external(extension, size)
-        } else {
-            self.read_internal(size)
         }
     }
 }

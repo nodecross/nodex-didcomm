@@ -2,9 +2,12 @@ pub mod did_vc;
 pub mod encrypted;
 pub mod types;
 
-use crate::config::server_config;
+#[cfg(test)]
+pub mod test_utils {
+    use rand::distributions::{Alphanumeric, DistString as _};
 
-fn attachment_link() -> String {
-    let server_config = server_config();
-    server_config.did_attachment_link()
+    pub fn create_random_did() -> String {
+        let random_string = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
+        format!("did:nodex:test:{}", random_string)
+    }
 }
