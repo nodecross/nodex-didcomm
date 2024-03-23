@@ -35,7 +35,7 @@ serde_jcs = { version = "0.1.0" }
 serde_json = { version = "1.0.71" }
 sha2 = { version = "0.10.2" }
 thiserror = "1.0.57"
-x25519-dalek = { version = "2.0.1" }
+x25519-dalek = { version = "2.0.1", features = ["static_secrets"]}
 
 [dev-dependencies]
 actix-rt = { version = "2.7.0" }
