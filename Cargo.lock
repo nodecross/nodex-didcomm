@@ -642,6 +642,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "curve25519-dalek"
+version = "4.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0a677b8922c94e01bdbb12126b0bc852f00447528dee1782229af9c720c3f348"
+dependencies = [
+ "cfg-if",
+ "cpufeatures",
+ "curve25519-dalek-derive",
+ "fiat-crypto",
+ "platforms",
+ "rustc_version",
+ "subtle 2.4.1",
+ "zeroize",
+]
+
+[[package]]
+name = "curve25519-dalek-derive"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f46882e17999c6cc590af592290432be3bce0428cb0d5f8b6715e4dc7b383eb3"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.53",
+]
+
+[[package]]
 name = "data-encoding"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -693,7 +720,7 @@ dependencies = [
  "base64 0.13.1",
  "bbs",
  "bs58",
- "curve25519-dalek",
+ "curve25519-dalek 3.2.1",
  "did_url",
  "ed25519-dalek",
  "generic-array 0.12.4",
@@ -705,7 +732,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.9.9",
- "x25519-dalek",
+ "x25519-dalek 1.2.0",
 ]
 
 [[package]]
@@ -745,7 +772,7 @@ dependencies = [
  "sha2 0.8.2",
  "thiserror",
  "uuid",
- "x25519-dalek",
+ "x25519-dalek 1.2.0",
 ]
 
 [[package]]
@@ -816,7 +843,7 @@ version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c762bae6dcaf24c4c84667b8579785430908723d5c889f469d76a41d59cc7a9d"
 dependencies = [
- "curve25519-dalek",
+ "curve25519-dalek 3.2.1",
  "ed25519",
  "rand 0.7.3",
  "serde",
@@ -976,6 +1003,12 @@ dependencies = [
  "quote",
  "syn 1.0.109",
 ]
+
+[[package]]
+name = "fiat-crypto"
+version = "0.2.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c007b1ae3abe1cb6f85a16305acd418b7ca6343b953633fee2b76d8f108b830f"
 
 [[package]]
 name = "fixed"
@@ -1204,14 +1237,15 @@ checksum = "290f1a1d9242c78d09ce40a5e87e7554ee637af1351968159f4952f028f75604"
 
 [[package]]
 name = "hdwallet"
-version = "0.3.1"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9cd89bf343be18dbe1e505100e48168bbd084760e842a8fed0317d2361470193"
+checksum = "5a03ba7d4c9ea41552cd4351965ff96883e629693ae85005c501bb4b9e1c48a7"
 dependencies = [
  "lazy_static",
  "rand_core 0.6.4",
  "ring 0.16.20",
  "secp256k1",
+ "thiserror",
 ]
 
 [[package]]
@@ -1731,7 +1765,7 @@ dependencies = [
  "serde_json",
  "sha2 0.10.8",
  "thiserror",
- "x25519-dalek",
+ "x25519-dalek 2.0.1",
 ]
 
 [[package]]
@@ -2021,6 +2055,12 @@ dependencies = [
  "spki 0.5.4",
  "zeroize",
 ]
+
+[[package]]
+name = "platforms"
+version = "3.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "626dec3cac7cc0e1577a2ec3fc496277ec2baa084bebad95bb6fdbfae235f84c"
 
 [[package]]
 name = "poly1305"
@@ -2344,6 +2384,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d626bb9dae77e28219937af045c257c28bfd3f69333c512553507f5f9798cb76"
 
 [[package]]
+name = "rustc_version"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bfa0f585226d2e68097d4f95d113b15b83a82e819ab25717ec0590d9584ef366"
+dependencies = [
+ "semver",
+]
+
+[[package]]
 name = "rustix"
 version = "0.38.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2431,21 +2480,27 @@ dependencies = [
 
 [[package]]
 name = "secp256k1"
-version = "0.21.3"
+version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c42e6f1735c5f00f51e43e28d6634141f2bcad10931b2609ddd74a86d751260"
+checksum = "4124a35fe33ae14259c490fd70fa199a32b9ce9502f2ee6bc4f81ec06fa65894"
 dependencies = [
  "secp256k1-sys",
 ]
 
 [[package]]
 name = "secp256k1-sys"
-version = "0.4.2"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "957da2573cde917463ece3570eab4a0b3f19de6f1646cde62e6fd3868f566036"
+checksum = "70a129b9e9efbfb223753b9163c4ab3b13cff7fd9c7f010fbac25ab4099fa07e"
 dependencies = [
  "cc",
 ]
+
+[[package]]
+name = "semver"
+version = "1.0.22"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "92d43fe69e652f3df9bdc2b85b2854a0825b86e4fb76bc44d945137d053639ca"
 
 [[package]]
 name = "serde"
@@ -3259,8 +3314,20 @@ version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2392b6b94a576b4e2bf3c5b2757d63f10ada8020a2e4d08ac849ebcf6ea8e077"
 dependencies = [
- "curve25519-dalek",
+ "curve25519-dalek 3.2.1",
  "rand_core 0.5.1",
+ "zeroize",
+]
+
+[[package]]
+name = "x25519-dalek"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c7e468321c81fb07fa7f4c636c3972b9100f0346e5b6a9f2bd0603a52f7ed277"
+dependencies = [
+ "curve25519-dalek 4.1.2",
+ "rand_core 0.6.4",
+ "serde",
  "zeroize",
 ]
 
