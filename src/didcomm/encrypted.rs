@@ -15,7 +15,7 @@ use crate::{
         self,
         base64_url::{self, PaddingType},
     },
-    did::did_repository::DidRepository,
+    did::did_repository::{CreateIdentifierError, DidRepository, FindIdentifierError},
     didcomm::types::DIDCommMessage,
     keyring::{self, keypair::KeyPairing},
     verifiable_credentials::{
@@ -42,6 +42,10 @@ pub enum DIDCommEncryptedServiceGenerateError {
     DidPublicKeyNotFound(String),
     #[error("something went wrong with vc service")]
     VCServiceError(#[from] DIDVCServiceGenerateError),
+    #[error("failed to find identifier")]
+    SidetreeFindRequestFailed(#[from] FindIdentifierError),
+    #[error("failed to create identifier")]
+    SidetreeCreateRequestFailed(#[from] CreateIdentifierError),
     #[error("failed to encrypt message")]
     EncryptFailed(#[from] didcomm_rs::Error),
     #[error(transparent)]
@@ -56,6 +60,8 @@ pub enum DIDCommEncryptedServiceVerifyError {
     RuntimeSecp256k1Error(#[from] runtime::secp256k1::Secp256k1Error),
     #[error("did not found : {0}")]
     DIDNotFound(String),
+    #[error("failed to find identifier")]
+    SidetreeFindRequestFailed(#[from] FindIdentifierError),
     #[error("did public key not found : did = {0}")]
     DidPublicKeyNotFound(String),
     #[error(transparent)]

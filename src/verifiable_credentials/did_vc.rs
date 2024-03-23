@@ -4,7 +4,7 @@ use serde_json::Value;
 use thiserror::Error;
 
 use crate::{
-    did::did_repository::DidRepository,
+    did::did_repository::{DidRepository, FindIdentifierError},
     keyring::{self, keypair},
     verifiable_credentials::{
         credential_signer::{
@@ -41,6 +41,8 @@ pub enum DIDVCServiceVerifyError {
     VerifyFailed(#[from] CredentialSignerVerifyError),
     #[error("public_keys length must be 1")]
     PublicKeyLengthMismatch,
+    #[error("sidetree find request failed")]
+    SidetreeFindRequestFailed(#[from] FindIdentifierError),
     #[error("signature is not verified")]
     SignatureNotVerified,
     #[error(transparent)]
