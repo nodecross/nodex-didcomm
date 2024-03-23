@@ -1,0 +1,57 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'Cargo.toml' # run only on changes to the Cargo.toml file
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install `cargo-get`
+        run: cargo install cargo-get
+
+      - name: Set Crate Version as Environment Variable
+        id: set_crate_version
+        run: |
+          CARGO_TOML_VERSION=$(cargo get package.version)
+          echo "version=$CARGO_TOML_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Check next tag not exists
+        id: check-tag-exists
+        run: |
+          if git show ${{ steps.set_crate_version.outputs.version }} >/dev/null 2>&1; then
+            echo "Tag ${{ steps.set_crate_version.outputs.version }} already exists"
+            echo "result=failure" >> $GITHUB_OUTPUT
+          else
+            echo "Tag ${{ steps.set_crate_version.outputs.version }} does not exist"
+            echo "result=success" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Release
+        uses: actions/github-script@v5
+        if: steps.check-tag-exists.outputs.result == 'success'
+        with:
+          result-encoding: string
+          script: |
+            const fs = require('fs').promises;
+            const release = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: "v${{ steps.set_crate_version.outputs.version }}",
+              generate_release_notes: true
+            });
+            return release.data.id;
