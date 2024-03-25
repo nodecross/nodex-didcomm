@@ -1,3 +1,20 @@
 [tools]
-"cargo:typos-cli" = "latest"
+actionlint = "1.6.27"
+"cargo:cargo-edit" = "latest"
+"cargo:cargo-get" = "latest"
 "cargo:cargo-machete" = "latest"
+"cargo:cargo-udeps" = "latest"
+"cargo:typos-cli" = "latest"
+typos = "1.19.0"
+
+[tasks.fix]
+description = 'format and then lint the code'
+env = { RUST_BACKTRACE = '1' }
+run = """
+#!/usr/bin/env bash
+taplo fmt
+cargo fix --allow-dirty --allow-staged
+cargo +nightly fmt --all
+cargo clippy --all-targets -- -D warnings
+typos
+"""

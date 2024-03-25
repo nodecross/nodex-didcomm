@@ -3,7 +3,7 @@ use serde_json::Value;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct VerifiedContainer {
-    pub message: GeneralVcDataModel,
+    pub message: VerifiableCredentials,
     pub metadata: Option<Value>,
 }
 
@@ -51,7 +51,7 @@ pub struct Proof {
 }
 
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Clone)]
-pub struct GeneralVcDataModel {
+pub struct VerifiableCredentials {
     // NOTE: 'id' property is optional.
     #[serde(rename = "id", skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,

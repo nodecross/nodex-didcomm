@@ -33,8 +33,8 @@ pub struct KeyPairSecp256K1 {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Secp256k1HexKeyPair {
-    public: String,
-    private: String,
+    pub public: String,
+    pub private: String,
 }
 
 pub(crate) const PRIVATE_KEY_SIZE: usize = 32; // Buffer(PrivateKey (32 = 256 bit))
