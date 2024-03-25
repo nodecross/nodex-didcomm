@@ -42,7 +42,7 @@ jobs:
           fi
 
       - name: Create Release
-        uses: actions/github-script@v5
+        uses: actions/github-script@v7
         if: steps.check-tag-exists.outputs.result == 'success'
         with:
           result-encoding: string
