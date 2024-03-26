@@ -11,17 +11,23 @@ use crate::{
             CredentialSigner, CredentialSignerSignError, CredentialSignerSuite,
             CredentialSignerVerifyError,
         },
-        types::{CredentialSubject, GeneralVcDataModel, Issuer},
+        types::{CredentialSubject, Issuer, VerifiableCredentials},
     },
 };
 
-pub struct DIDVCService {
-    did_repository: Box<dyn DidRepository + Send + Sync + 'static>,
+pub struct DIDVCService<R: DidRepository> {
+    pub(crate) did_repository: R,
 }
 
-impl DIDVCService {
-    pub fn new<R: DidRepository + Send + Sync + 'static>(did_repository: R) -> Self {
-        Self { did_repository: Box::new(did_repository) }
+impl<R: DidRepository> DIDVCService<R> {
+    pub fn new(did_repository: R) -> Self {
+        Self { did_repository }
+    }
+}
+
+impl<R: DidRepository + Clone> Clone for DIDVCService<R> {
+    fn clone(&self) -> Self {
+        Self { did_repository: self.did_repository.clone() }
     }
 }
 
@@ -49,18 +55,18 @@ pub enum DIDVCServiceVerifyError {
     Other(#[from] anyhow::Error),
 }
 
-impl DIDVCService {
+impl<R: DidRepository> DIDVCService<R> {
     pub fn generate(
         &self,
         from_did: &str,
         from_keyring: &keypair::KeyPairing,
         message: &Value,
         issuance_date: DateTime<Utc>,
-    ) -> Result<GeneralVcDataModel, DIDVCServiceGenerateError> {
+    ) -> Result<VerifiableCredentials, DIDVCServiceGenerateError> {
         let r#type = "VerifiableCredential".to_string();
         let context = "https://www.w3.org/2018/credentials/v1".to_string();
 
-        let model = GeneralVcDataModel {
+        let model = VerifiableCredentials {
             id: None,
             issuer: Issuer { id: from_did.to_string() },
             r#type: vec![r#type],
@@ -71,7 +77,7 @@ impl DIDVCService {
             proof: None,
         };
 
-        let signed: GeneralVcDataModel = CredentialSigner::sign(
+        let signed: VerifiableCredentials = CredentialSigner::sign(
             &model,
             CredentialSignerSuite {
                 did: from_did,
@@ -86,8 +92,8 @@ impl DIDVCService {
 
     pub async fn verify(
         &self,
-        model: GeneralVcDataModel,
-    ) -> Result<GeneralVcDataModel, DIDVCServiceVerifyError> {
+        model: VerifiableCredentials,
+    ) -> Result<VerifiableCredentials, DIDVCServiceVerifyError> {
         let did_document = self
             .did_repository
             .find_identifier(&model.issuer.id)
@@ -126,9 +132,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        common::extension::trng::OSRandomNumberGenerator,
         did::{did_repository::mocks::MockDidRepository, test_utils::create_random_did},
-        keyring::keypair::KeyPairing,
+        keyring::{extension::trng::OSRandomNumberGenerator, keypair::KeyPairing},
     };
 
     #[actix_rt::test]
@@ -138,8 +143,10 @@ mod tests {
         let trng = OSRandomNumberGenerator::default();
         let from_keyring = KeyPairing::create_keyring(&trng).unwrap();
 
-        let mock_repository =
-            MockDidRepository::new(BTreeMap::from_iter([(from_did.clone(), from_keyring.clone())]));
+        let mock_repository = MockDidRepository::from_single(BTreeMap::from_iter([(
+            from_did.clone(),
+            from_keyring.clone(),
+        )]));
 
         let service = DIDVCService::new(mock_repository);
 
@@ -170,7 +177,7 @@ mod tests {
             )
             .unwrap();
 
-            let mock_repository = MockDidRepository::new(BTreeMap::new());
+            let mock_repository = MockDidRepository::from_single(BTreeMap::new());
 
             let service = DIDVCService::new(mock_repository);
 
@@ -195,8 +202,8 @@ mod tests {
             from_keyring: &KeyPairing,
             message: &Value,
             issuance_date: DateTime<Utc>,
-        ) -> GeneralVcDataModel {
-            let service = DIDVCService::new(MockDidRepository::new(BTreeMap::new()));
+        ) -> VerifiableCredentials {
+            let service = DIDVCService::new(MockDidRepository::from_single(BTreeMap::new()));
 
             service.generate(from_did, from_keyring, message, issuance_date).unwrap()
         }
@@ -205,7 +212,7 @@ mod tests {
         async fn test_did_not_found() {
             let from_did = create_random_did();
 
-            let mock_repository = MockDidRepository::new(BTreeMap::new());
+            let mock_repository = MockDidRepository::from_single(BTreeMap::new());
 
             let service = DIDVCService::new(mock_repository);
 
@@ -259,7 +266,7 @@ mod tests {
             // for failing credential signer
             model.proof = None;
 
-            let mock_repository = MockDidRepository::new(BTreeMap::from_iter([(
+            let mock_repository = MockDidRepository::from_single(BTreeMap::from_iter([(
                 from_did.clone(),
                 KeyPairing::create_keyring(&OSRandomNumberGenerator::default()).unwrap(),
             )]));
@@ -306,7 +313,7 @@ mod tests {
                 Utc::now(),
             );
 
-            let mock_repository = MockDidRepository::new(BTreeMap::from_iter([(
+            let mock_repository = MockDidRepository::from_single(BTreeMap::from_iter([(
                 from_did.clone(),
                 KeyPairing::create_keyring(&OSRandomNumberGenerator::default()).unwrap(),
             )]));

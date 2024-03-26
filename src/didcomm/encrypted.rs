@@ -11,23 +11,29 @@ use thiserror::Error;
 use x25519_dalek::{PublicKey, StaticSecret};
 
 use crate::{
-    common::runtime::{
-        self,
-        base64_url::{self, PaddingType},
-    },
+    common::runtime,
     did::did_repository::{CreateIdentifierError, DidRepository, FindIdentifierError},
     didcomm::types::DIDCommMessage,
     keyring::{self, keypair::KeyPairing},
     verifiable_credentials::{
         did_vc::{DIDVCService, DIDVCServiceGenerateError},
-        types::{GeneralVcDataModel, VerifiedContainer},
+        types::{VerifiableCredentials, VerifiedContainer},
     },
 };
 
-pub struct DIDCommEncryptedService {
-    did_repository: Box<dyn DidRepository + Send + Sync + 'static>,
-    vc_service: DIDVCService,
+pub struct DIDCommEncryptedService<R: DidRepository> {
+    vc_service: DIDVCService<R>,
     attachment_link: String,
+}
+
+impl<R> Clone for DIDCommEncryptedService<R>
+where
+    R: DidRepository + Clone,
+    DIDVCService<R>: Clone,
+{
+    fn clone(&self) -> Self {
+        Self { vc_service: self.vc_service.clone(), attachment_link: self.attachment_link.clone() }
+    }
 }
 
 #[derive(Debug, Error)]
@@ -68,20 +74,15 @@ pub enum DIDCommEncryptedServiceVerifyError {
     Other(#[from] anyhow::Error),
 }
 
-impl DIDCommEncryptedService {
-    pub fn new<R: DidRepository + Send + Sync + 'static>(
-        did_repository: R,
-        vc_service: DIDVCService,
-        attachment_link: Option<String>,
-    ) -> DIDCommEncryptedService {
+impl<R: DidRepository> DIDCommEncryptedService<R> {
+    pub fn new(did_repository: R, attachment_link: Option<String>) -> DIDCommEncryptedService<R> {
         fn default_attachment_link() -> String {
             std::env::var("NODEX_DID_ATTACHMENT_LINK")
                 .unwrap_or("https://did.getnodex.io".to_string())
         }
 
         DIDCommEncryptedService {
-            did_repository: Box::new(did_repository),
-            vc_service,
+            vc_service: DIDVCService::new(did_repository),
             attachment_link: attachment_link.unwrap_or(default_attachment_link()),
         }
     }
@@ -97,7 +98,7 @@ impl DIDCommEncryptedService {
     ) -> Result<DIDCommMessage, DIDCommEncryptedServiceGenerateError> {
         // NOTE: recipient to
         let did_document =
-            self.did_repository.find_identifier(to_did).await?.ok_or_else(|| {
+            self.vc_service.did_repository.find_identifier(to_did).await?.ok_or_else(|| {
                 DIDCommEncryptedServiceGenerateError::DIDNotFound(to_did.to_string())
             })?;
 
@@ -169,22 +170,12 @@ impl DIDCommEncryptedService {
         my_keyring: &KeyPairing,
         message: &DIDCommMessage,
     ) -> Result<VerifiedContainer, DIDCommEncryptedServiceVerifyError> {
-        let protected = &message.protected;
-
-        let decoded = base64_url::Base64Url::decode_as_string(protected, &PaddingType::NoPadding)
-            .context("failed to base64 decode protected")?;
-        let decoded =
-            serde_json::from_str::<Value>(&decoded).context("failed to decode to json")?;
-
-        let other_did = decoded
-            .get("skid")
-            .context("skid not found")?
-            .as_str()
-            .context("failed to serialize skid")?;
+        let other_did = message.find_sender()?;
 
         let did_document = self
+            .vc_service
             .did_repository
-            .find_identifier(other_did)
+            .find_identifier(&other_did)
             .await?
             .ok_or(DIDCommEncryptedServiceVerifyError::DIDNotFound(other_did.to_string()))?;
 
@@ -226,7 +217,7 @@ impl DIDCommEncryptedService {
         let body =
             message.get_body().map_err(|e| anyhow::anyhow!("failed to get body : {:?}", e))?;
         let body =
-            serde_json::from_str::<GeneralVcDataModel>(&body).context("failed to parse body")?;
+            serde_json::from_str::<VerifiableCredentials>(&body).context("failed to parse body")?;
 
         match metadata {
             Some(metadata) => {
@@ -249,9 +240,9 @@ mod tests {
 
     use super::*;
     use crate::{
-        common::extension::trng::OSRandomNumberGenerator,
-        did::did_repository::mocks::MockDidRepository, didcomm::test_utils::create_random_did,
-        keyring::keypair::KeyPairing,
+        did::did_repository::mocks::MockDidRepository,
+        didcomm::test_utils::create_random_did,
+        keyring::{extension::trng::OSRandomNumberGenerator, keypair::KeyPairing},
     };
 
     #[actix_rt::test]
@@ -263,13 +254,12 @@ mod tests {
         let from_keyring = KeyPairing::create_keyring(&trng).unwrap();
         let to_keyring = KeyPairing::create_keyring(&trng).unwrap();
 
-        let repo = MockDidRepository::new(BTreeMap::from_iter([
+        let repo = MockDidRepository::from_single(BTreeMap::from_iter([
             (from_did.clone(), from_keyring.clone()),
             (to_did.clone(), to_keyring.clone()),
         ]));
 
-        let service = DIDVCService::new(repo.clone());
-        let service = DIDCommEncryptedService::new(repo, service, None);
+        let service = DIDCommEncryptedService::new(repo, None);
 
         let message = json!({"test": "0123456789abcdef"});
         let issuance_date = Utc::now();
@@ -299,13 +289,12 @@ mod tests {
             let trng = OSRandomNumberGenerator::default();
             let from_keyring = KeyPairing::create_keyring(&trng).unwrap();
 
-            let repo = MockDidRepository::new(BTreeMap::from_iter([(
+            let repo = MockDidRepository::from_single(BTreeMap::from_iter([(
                 from_did.clone(),
                 from_keyring.clone(),
             )]));
 
-            let service = DIDVCService::new(repo.clone());
-            let service = DIDCommEncryptedService::new(repo, service, None);
+            let service = DIDCommEncryptedService::new(repo, None);
 
             let message = json!({"test": "0123456789abcdef"});
             let issuance_date = Utc::now();
@@ -332,8 +321,7 @@ mod tests {
 
             let repo = NoPublicKeyDidRepository;
 
-            let service = DIDVCService::new(repo);
-            let service = DIDCommEncryptedService::new(repo, service, None);
+            let service = DIDCommEncryptedService::new(repo, None);
 
             let message = json!({"test": "0123456789abcdef"});
             let issuance_date = Utc::now();
@@ -364,13 +352,12 @@ mod tests {
             )
             .unwrap();
 
-            let repo = MockDidRepository::new(BTreeMap::from_iter([
+            let repo = MockDidRepository::from_single(BTreeMap::from_iter([
                 (from_did.clone(), from_keyring.clone()),
                 (to_did.clone(), to_keyring.clone()),
             ]));
 
-            let service = DIDVCService::new(NoPublicKeyDidRepository);
-            let service = DIDCommEncryptedService::new(repo, service, None);
+            let service = DIDCommEncryptedService::new(repo, None);
 
             let message = json!({"test": "0123456789abcdef"});
             let issuance_date = Utc::now();
@@ -400,13 +387,12 @@ mod tests {
             metadata: Option<&Value>,
             issuance_date: DateTime<Utc>,
         ) -> DIDCommMessage {
-            let repo = MockDidRepository::new(BTreeMap::from_iter([(
+            let repo = MockDidRepository::from_single(BTreeMap::from_iter([(
                 to_did.to_string(),
                 to_keyring.clone(),
             )]));
 
-            let service = DIDVCService::new(repo.clone());
-            let service = DIDCommEncryptedService::new(repo, service, None);
+            let service = DIDCommEncryptedService::new(repo, None);
 
             service
                 .generate(from_did, to_did, from_keyring, message, metadata, issuance_date)
@@ -437,11 +423,12 @@ mod tests {
             )
             .await;
 
-            let repo =
-                MockDidRepository::new(BTreeMap::from_iter([(to_did.clone(), to_keyring.clone())]));
+            let repo = MockDidRepository::from_single(BTreeMap::from_iter([(
+                to_did.clone(),
+                to_keyring.clone(),
+            )]));
 
-            let service = DIDVCService::new(repo.clone());
-            let service = DIDCommEncryptedService::new(repo, service, None);
+            let service = DIDCommEncryptedService::new(repo, None);
 
             let res = service.verify(&from_keyring, &res).await.unwrap_err();
 
@@ -477,8 +464,7 @@ mod tests {
 
             let repo = NoPublicKeyDidRepository;
 
-            let service = DIDVCService::new(repo);
-            let service = DIDCommEncryptedService::new(repo, service, None);
+            let service = DIDCommEncryptedService::new(repo, None);
 
             let res = service.verify(&from_keyring, &res).await.unwrap_err();
 

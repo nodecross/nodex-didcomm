@@ -1,3 +1,6 @@
 [files]
-extend-exclude = []
+extend-exclude = [
+    # These file contains base64 encoded data. it's not a typo.
+    "test_resources/*_didcomm_message.json",
+]
 ignore-files = true

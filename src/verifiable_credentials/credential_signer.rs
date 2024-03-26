@@ -7,7 +7,7 @@ use super::types::Proof;
 use crate::{
     common::{cipher::jws::Jws, utils},
     keyring::secp256k1::Secp256k1,
-    verifiable_credentials::types::GeneralVcDataModel,
+    verifiable_credentials::types::VerifiableCredentials,
 };
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -44,10 +44,10 @@ pub struct CredentialSigner {}
 
 impl CredentialSigner {
     pub fn sign(
-        object: &GeneralVcDataModel,
+        object: &VerifiableCredentials,
         suite: CredentialSignerSuite,
         created: DateTime<Utc>,
-    ) -> Result<GeneralVcDataModel, CredentialSignerSignError> {
+    ) -> Result<VerifiableCredentials, CredentialSignerSignError> {
         let jws = Jws::encode(&json!(object), suite.context)?;
 
         let did = suite.did;
@@ -71,13 +71,13 @@ impl CredentialSigner {
 
         utils::json::merge(&mut signed_object, json!(proof));
 
-        Ok(serde_json::from_value::<GeneralVcDataModel>(signed_object)?)
+        Ok(serde_json::from_value::<VerifiableCredentials>(signed_object)?)
     }
 
     pub fn verify(
-        mut object: GeneralVcDataModel,
+        mut object: VerifiableCredentials,
         context: &Secp256k1,
-    ) -> Result<(GeneralVcDataModel, bool), CredentialSignerVerifyError> {
+    ) -> Result<(VerifiableCredentials, bool), CredentialSignerVerifyError> {
         let proof = object.proof.take().ok_or(CredentialSignerVerifyError::ProofNotFound)?;
 
         let jws = proof.jws;
@@ -115,7 +115,7 @@ pub mod tests {
         let context =
             keyring::secp256k1::Secp256k1::new(PUBLIC_KEY.to_vec(), PRIVATE_KEY.to_vec()).unwrap();
 
-        let model = GeneralVcDataModel {
+        let model = VerifiableCredentials {
             id: None,
             r#type: vec!["type".to_string()],
             issuer: Issuer { id: "issuer".to_string() },
@@ -162,7 +162,7 @@ pub mod tests {
         let context =
             keyring::secp256k1::Secp256k1::new(PUBLIC_KEY.to_vec(), PRIVATE_KEY.to_vec()).unwrap();
 
-        let model = GeneralVcDataModel {
+        let model = VerifiableCredentials {
             id: None,
             r#type: vec!["type".to_string()],
             issuer: Issuer { id: "issuer".to_string() },

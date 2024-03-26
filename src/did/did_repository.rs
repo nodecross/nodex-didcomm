@@ -134,11 +134,15 @@ pub mod mocks {
 
     #[derive(Clone)]
     pub struct MockDidRepository {
-        map: BTreeMap<String, KeyPairing>,
+        map: BTreeMap<String, Vec<KeyPairing>>,
     }
 
     impl MockDidRepository {
-        pub fn new(map: BTreeMap<String, KeyPairing>) -> Self {
+        pub fn from_single(map: BTreeMap<String, KeyPairing>) -> Self {
+            Self { map: map.into_iter().map(|(k, v)| (k, vec![v])).collect() }
+        }
+
+        pub fn new(map: BTreeMap<String, Vec<KeyPairing>>) -> Self {
             Self { map }
         }
     }
@@ -155,19 +159,22 @@ pub mod mocks {
             &self,
             did: &str,
         ) -> Result<Option<DIDResolutionResponse>, FindIdentifierError> {
-            if let Some(keyring) = self.map.get(did) {
-                let jwk = keyring.sign.to_jwk(false).unwrap();
+            if let Some(keyrings) = self.map.get(did) {
+                let public_keys = keyrings
+                    .iter()
+                    .map(|keyring| DidPublicKey {
+                        id: did.to_string() + "#signingKey",
+                        controller: String::new(),
+                        r#type: "EcdsaSecp256k1VerificationKey2019".to_string(),
+                        public_key_jwk: keyring.sign.to_jwk(false).unwrap(),
+                    })
+                    .collect();
 
                 let response = DIDResolutionResponse {
                     context: "https://www.w3.org/ns/did-resolution/v1".to_string(),
                     did_document: DIDDocument {
                         id: did.to_string(),
-                        public_key: Some(vec![DidPublicKey {
-                            id: did.to_string() + "#signingKey",
-                            controller: String::new(),
-                            r#type: "EcdsaSecp256k1VerificationKey2019".to_string(),
-                            public_key_jwk: jwk,
-                        }]),
+                        public_key: Some(public_keys),
                         service: None,
                         authentication: Some(vec!["signingKey".to_string()]),
                     },

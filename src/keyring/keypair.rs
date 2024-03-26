@@ -3,8 +3,11 @@ use std::convert::TryFrom;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use super::secp256k1::{Secp256k1, Secp256k1Error, Secp256k1HexKeyPair};
-use crate::common::{extension::trng::Trng, runtime};
+use super::{
+    extension::trng::{self, Trng},
+    secp256k1::{Secp256k1, Secp256k1Error, Secp256k1HexKeyPair},
+};
+use crate::common::runtime;
 
 #[derive(Debug, Clone)]
 pub struct KeyPairing {
@@ -28,7 +31,7 @@ pub enum KeyPairingError {
     #[error("secp256k1 error")]
     KeyInitializationFailed(#[from] Secp256k1Error),
     #[error("Trng error")]
-    TrngGenerationFailed(#[from] crate::common::extension::trng::TrngError),
+    TrngGenerationFailed(#[from] trng::TrngError),
     #[error("BIP32 error")]
     BIP32Error(#[from] runtime::bip32::BIP32Error),
 }
@@ -87,7 +90,7 @@ impl TryFrom<&KeyPairingHex> for KeyPairing {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::common::extension::trng::OSRandomNumberGenerator;
+    use crate::keyring::extension::trng::OSRandomNumberGenerator;
 
     #[test]
     pub fn test_create_keyring() {
