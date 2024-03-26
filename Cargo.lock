@@ -1081,7 +1081,6 @@ dependencies = [
  "getrandom 0.2.12",
  "hdwallet",
  "hex",
- "hmac 0.12.1",
  "http",
  "ibig",
  "k256 0.13.3",
