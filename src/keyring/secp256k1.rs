@@ -33,8 +33,9 @@ pub struct KeyPairSecp256K1 {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Secp256k1HexKeyPair {
-    pub public: String,
-    pub private: String,
+    // MEMO: Matching schema in NodeX config.
+    pub public_key: String,
+    pub secret_key: String,
 }
 
 pub(crate) const PRIVATE_KEY_SIZE: usize = 32; // Buffer(PrivateKey (32 = 256 bit))
@@ -140,14 +141,14 @@ impl Secp256k1 {
 
     pub fn to_hex_key_pair(&self) -> Secp256k1HexKeyPair {
         Secp256k1HexKeyPair {
-            public: hex::encode(self.get_public_key()),
-            private: hex::encode(self.get_secret_key()),
+            public_key: hex::encode(self.get_public_key()),
+            secret_key: hex::encode(self.get_secret_key()),
         }
     }
 
     pub fn from_hex_key_pair(hex_key_pair: &Secp256k1HexKeyPair) -> Result<Self, Secp256k1Error> {
-        let public = hex::decode(&hex_key_pair.public)?;
-        let private = hex::decode(&hex_key_pair.private)?;
+        let public = hex::decode(&hex_key_pair.public_key)?;
+        let private = hex::decode(&hex_key_pair.secret_key)?;
 
         Self::new(public, private)
     }
@@ -267,11 +268,11 @@ pub mod tests {
         let result = node.to_hex_key_pair();
 
         assert_eq!(
-            result.private,
+            result.secret_key,
             "c739805ab03da62ddbe03390acdf7615640aa6ed31b8f18243f04a572c528edb"
         );
         assert_eq!(
-            result.public,
+            result.public_key,
             "0470964532f083f45fe8e8ccea96a22f6018d46a406f583ab226b19283aa605c44851b9274e6a2ce2ad42b4169e37df5f6cb38e81604b3ca2ebe11dd085862b490"
         );
     }
