@@ -94,6 +94,7 @@ impl<R: DidRepository> DIDVCService<R> {
         &self,
         model: VerifiableCredentials,
     ) -> Result<VerifiableCredentials, DIDVCServiceVerifyError> {
+        print!("model {:#?}", model);
         let did_document = self
             .did_repository
             .find_identifier(&model.issuer.id)
@@ -114,7 +115,11 @@ impl<R: DidRepository> DIDVCService<R> {
         let context = keyring::secp256k1::Secp256k1::from_jwk(&public_key.public_key_jwk)
             .context("failed to convert key")?;
 
+        print!("model {:#?}", model);
+        print!("context {:#?}", context);
         let (verified_model, verified) = CredentialSigner::verify(model, &context)?;
+        print!("verified_model {:#?}", verified_model);
+        print!("verified {:#?}", verified);
 
         if verified {
             Ok(verified_model)
