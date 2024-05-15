@@ -1,4 +1,5 @@
-use hmac::digest::generic_array::GenericArray;
+use std::convert::TryInto;
+
 use k256::{
     ecdsa::{
         signature::{Signer, Verifier},
@@ -65,8 +66,8 @@ impl Secp256k1 {
             return Err(Secp256k1Error::InvalidSignatureLength(signature.len()));
         }
 
-        let r = GenericArray::from_slice(&signature[0..32]);
-        let s = GenericArray::from_slice(&signature[32..]);
+        let r: &[u8; 32] = &signature[0..32].try_into().unwrap();
+        let s: &[u8; 32] = &signature[32..].try_into().unwrap();
 
         let wrapped_signature = Signature::from_scalars(*r, *s)?;
 
