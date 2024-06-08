@@ -111,7 +111,10 @@ impl<C: SidetreeHttpClient + Send + Sync> DidRepository for DidRepositoryImpl<C>
 
         match response.status_code {
             StatusCode::OK => {
-                Ok(Some(serde_json::from_str(&response.body).context("failed to parse body")?))
+                println!("response.body: {:?}", response.body);
+                let body = serde_json::from_str(&response.body).context("failed to parse body")?;
+                println!("body: {:?}", body);
+                Ok(Some(body))
             }
             StatusCode::NOT_FOUND => Ok(None),
             _ => Err(FindIdentifierError::SidetreeRequestFailed(anyhow::anyhow!(

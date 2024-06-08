@@ -171,6 +171,7 @@ impl<R: DidRepository> DIDCommEncryptedService<R> {
         message: &DIDCommMessage,
     ) -> Result<VerifiedContainer, DIDCommEncryptedServiceVerifyError> {
         let other_did = message.find_sender()?;
+        println!("other_did: {:?}", other_did);
 
         let did_document = self
             .vc_service
@@ -178,6 +179,8 @@ impl<R: DidRepository> DIDCommEncryptedService<R> {
             .find_identifier(&other_did)
             .await?
             .ok_or(DIDCommEncryptedServiceVerifyError::DIDNotFound(other_did.to_string()))?;
+        
+        println!("did_document: {:#?}", did_document);
 
         let public_keys = did_document.did_document.public_key.ok_or(
             DIDCommEncryptedServiceVerifyError::DidPublicKeyNotFound(other_did.to_string()),
@@ -218,9 +221,11 @@ impl<R: DidRepository> DIDCommEncryptedService<R> {
             message.get_body().map_err(|e| anyhow::anyhow!("failed to get body : {:?}", e))?;
         let body =
             serde_json::from_str::<VerifiableCredentials>(&body).context("failed to parse body")?;
+        println!("body: {:#?}", body);
 
         match metadata {
             Some(metadata) => {
+                println!("metadata: {:#?}", metadata);
                 let metadata =
                     metadata.data.json.as_ref().ok_or(anyhow::anyhow!("metadata not found"))?;
                 let metadata = serde_json::from_str::<Value>(metadata)
