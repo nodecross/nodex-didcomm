@@ -1,16 +1,11 @@
+use core::convert::TryInto;
+
+use data_encoding::BASE64URL_NOPAD;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_jcs;
 use thiserror::Error;
 
-use crate::{
-    common::runtime::{
-        base64_url::{Base64Url, PaddingType},
-        multihash::Multihash,
-    },
-    keyring::secp256k1::KeyPairSecp256K1,
-};
-
-pub struct OperationPayloadBuilder {}
+use crate::{common::runtime::multihash, keyring::jwk::Jwk};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ServiceEndpoint {
@@ -39,7 +34,7 @@ pub struct DidPublicKey {
     pub r#type: String,
 
     #[serde(rename = "publicKeyJwk")]
-    pub public_key_jwk: KeyPairSecp256K1,
+    pub public_key_jwk: Jwk,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -79,59 +74,44 @@ pub struct PublicKeyPayload {
     pub r#type: String,
 
     #[serde(rename = "jwk")]
-    pub jwk: KeyPairSecp256K1,
+    pub jwk: Jwk,
 
     #[serde(rename = "purpose")]
     pub purpose: Vec<String>,
 }
 
-// ACTION: add-public-keys
-#[allow(dead_code)]
-struct DIDAddPublicKeysPayload {
-    id: String,
-    r#type: String,
-    jwk: KeyPairSecp256K1,
-    purpose: Vec<String>,
+pub trait ToPublicKey<T: TryInto<Jwk>> {
+    fn to_public_key(
+        self,
+        key_type: String,
+        key_id: String,
+        purpose: Vec<String>,
+    ) -> Result<PublicKeyPayload, T::Error>;
 }
 
-#[allow(dead_code)]
-struct DIDAddPublicKeysAction {
-    action: String, //'add-public-keys',
-    public_keys: Vec<DIDAddPublicKeysPayload>,
-}
-
-// ACTION: remove-public-keys
-#[allow(dead_code)]
-struct DIDRemovePublicKeysAction {
-    action: String, // 'remove-public-keys',
-    ids: Vec<String>,
-}
-
-// ACTION: add-services
-#[allow(dead_code)]
-struct DIDAddServicesPayload {}
-
-#[allow(dead_code)]
-struct DIDAddServicesAction {
-    action: String, // 'add-services',
-    services: Vec<DIDAddServicesPayload>,
-}
-
-// ACTION: remove-services
-#[allow(dead_code)]
-struct DIDRemoveServicesAction {
-    action: String, // 'remove-services',
-    ids: Vec<String>,
+impl<T> ToPublicKey<T> for T
+where
+    T: TryInto<Jwk>,
+{
+    fn to_public_key(
+        self,
+        key_type: String,
+        key_id: String,
+        purpose: Vec<String>,
+    ) -> Result<PublicKeyPayload, T::Error> {
+        let jwk: Jwk = self.try_into()?;
+        Ok(PublicKeyPayload { id: key_id.into(), r#type: key_type.into(), jwk, purpose })
+    }
 }
 
 // ACTION: replace
 #[derive(Debug, Serialize, Deserialize)]
-struct DIDReplacePayload {
+pub struct DIDReplacePayload {
     #[serde(rename = "public_keys")]
-    public_keys: Vec<PublicKeyPayload>,
+    pub public_keys: Vec<PublicKeyPayload>,
 
     #[serde(rename = "service_endpoints")]
-    service_endpoints: Vec<String>,
+    pub service_endpoints: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -191,10 +171,10 @@ pub struct DIDResolutionResponse {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct CommitmentKeys {
     #[serde(rename = "recovery")]
-    pub recovery: KeyPairSecp256K1,
+    pub recovery: Jwk,
 
     #[serde(rename = "update")]
-    pub update: KeyPairSecp256K1,
+    pub update: Jwk,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -228,102 +208,68 @@ pub struct DIDCreateResponse {
     pub method_metadata: MethodMetadata,
 }
 
-#[allow(dead_code)]
-struct DIDUpdateRequest {
-    // NOT IMPLEMENTED
-}
-
-#[allow(dead_code)]
-struct DIDUpdateResponse {
-    // NOT IMPLEMENTED
-}
-
-#[allow(dead_code)]
-struct DIDRecoverRequest {
-    // NOT IMPLEMENTED
-}
-
-#[allow(dead_code)]
-struct DIDRecoverResponse {
-    // NOT IMPLEMENTED
-}
-
-#[allow(dead_code)]
-struct DIDDeactivateRequest {
-    // NOT IMPLEMENTED
-}
-
-#[allow(dead_code)]
-struct DIDDeactivateResponse {
-    // NOT IMPLEMENTED
-}
-
 #[derive(Debug, Error)]
-pub enum OperationPayloadBuilderError {
+pub enum DIDCreatePayloadError {
     #[error(transparent)]
-    MultihashError(#[from] crate::common::runtime::multihash::MultihashError),
+    SerdeJsonError(#[from] serde_json::Error),
 }
 
-impl OperationPayloadBuilder {
-    pub fn did_create_payload(
-        params: &DIDCreateRequest,
-    ) -> Result<String, OperationPayloadBuilderError> {
-        let update = json!(&params.commitment_keys.update);
-        let update_commitment =
-            Multihash::canonicalize_then_double_hash_then_encode(update.to_string().as_bytes())?;
+#[inline]
+fn canon<T>(value: &T) -> Result<Vec<u8>, serde_json::Error>
+where
+    T: ?Sized + Serialize,
+{
+    Ok(serde_jcs::to_string(value)?.into_bytes())
+}
 
-        let recovery = json!(&params.commitment_keys.recovery);
-        let recovery_commitment =
-            Multihash::canonicalize_then_double_hash_then_encode(recovery.to_string().as_bytes())?;
+pub fn did_create_payload(
+    replace_payload: DIDReplacePayload,
+    update_key: &Jwk,
+    recovery_key: &Jwk,
+) -> Result<String, DIDCreatePayloadError> {
+    let update = canon(update_key)?;
+    let update_commitment = multihash::double_hash_encode(&update);
+    let recovery = canon(recovery_key)?;
+    let recovery_commitment = multihash::double_hash_encode(&recovery);
+    let patch = DIDReplaceAction { action: "replace".to_string(), document: replace_payload };
+    let delta = DIDReplaceDeltaObject { patches: vec![patch], update_commitment };
+    let delta = canon(&delta)?;
+    let delta_hash = multihash::hash_encode(&delta);
 
-        let document: DIDReplacePayload = DIDReplacePayload {
-            public_keys: params.public_keys.clone(),
-            service_endpoints: params.service_endpoints.clone(),
-        };
-        let patch: DIDReplaceAction = DIDReplaceAction { action: "replace".to_string(), document };
+    let suffix = DIDReplaceSuffixObject { delta_hash, recovery_commitment };
+    let suffix = canon(&suffix)?;
+    let encoded_delta = BASE64URL_NOPAD.encode(&delta);
+    let encoded_suffix = BASE64URL_NOPAD.encode(&suffix);
 
-        let delta =
-            json!(DIDReplaceDeltaObject { patches: vec![patch], update_commitment }).to_string();
+    let payload = DIDCreatePayload {
+        r#type: "create".to_string(),
+        delta: encoded_delta,
+        suffix_data: encoded_suffix,
+    };
 
-        let delta_bytes = delta.as_bytes();
-        let delta_hash = Base64Url::encode(&Multihash::hash(delta_bytes), &PaddingType::NoPadding);
-
-        let suffix = json!(DIDReplaceSuffixObject { delta_hash, recovery_commitment }).to_string();
-
-        let suffix_bytes = suffix.as_bytes();
-
-        let encoded_delta = Base64Url::encode(delta_bytes, &PaddingType::NoPadding);
-        let encoded_suffix = Base64Url::encode(suffix_bytes, &PaddingType::NoPadding);
-
-        let payload: DIDCreatePayload = DIDCreatePayload {
-            r#type: "create".to_string(),
-            delta: encoded_delta,
-            suffix_data: encoded_suffix,
-        };
-
-        Ok(json!(payload).to_string())
-    }
+    Ok(serde_jcs::to_string(&payload)?)
 }
 
 #[cfg(test)]
 pub mod tests {
+    use rand_core::OsRng;
+
     use super::*;
-    use crate::{keyring, keyring::extension::trng::OSRandomNumberGenerator};
+    use crate::{keyring, keyring::keypair::KeyPair};
 
     #[test]
     pub fn test_did_create_payload() {
-        let trng: OSRandomNumberGenerator = OSRandomNumberGenerator::default();
-        let keyring = keyring::keypair::KeyPairing::create_keyring(&trng).unwrap();
+        let keyring = keyring::keypair::KeyPairing::create_keyring(OsRng);
+        let public = keyring
+            .sign
+            .get_public_key()
+            .to_public_key("".to_string(), "key_id".to_string(), vec!["".to_string()])
+            .unwrap();
+        let update: Jwk = keyring.recovery.get_public_key().try_into().unwrap();
+        let recovery: Jwk = keyring.update.get_public_key().try_into().unwrap();
 
-        let public = keyring.sign.to_public_key("key_id", &[""]).unwrap();
-        let update = keyring.recovery.to_jwk(false).unwrap();
-        let recovery = keyring.update.to_jwk(false).unwrap();
+        let document = DIDReplacePayload { public_keys: vec![public], service_endpoints: vec![] };
 
-        let _result = OperationPayloadBuilder::did_create_payload(&DIDCreateRequest {
-            public_keys: vec![public],
-            commitment_keys: CommitmentKeys { recovery, update },
-            service_endpoints: vec![],
-        })
-        .unwrap();
+        let _result = did_create_payload(document, &update, &recovery).unwrap();
     }
 }

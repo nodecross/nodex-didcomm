@@ -1,12 +1,12 @@
-use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
-use thiserror::Error;
-
-use super::signer::{Signer, SignerError};
-use crate::{
-    common::runtime::{self, base64_url::PaddingType},
-    keyring::secp256k1::Secp256k1,
+use data_encoding::BASE64URL_NOPAD;
+use hmac::digest::generic_array::GenericArray;
+use k256::ecdsa::{
+    signature::{Signer, Verifier},
+    Signature, SigningKey, VerifyingKey,
 };
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use thiserror::Error;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct JWSHeader {
@@ -15,24 +15,22 @@ struct JWSHeader {
     crit: Vec<String>,
 }
 
-pub struct Jws {}
-
 #[derive(Debug, Error)]
 pub enum JwsEncodeError {
-    #[error(transparent)]
-    SignerError(#[from] SignerError),
+    #[error("PublicKeyConvertError : {0:?}")]
+    SignatureError(#[from] k256::ecdsa::Error),
+    #[error("CanonicalizeError : {0:?}")]
+    CanonicalizeError(#[from] serde_json::Error),
 }
 
 #[derive(Debug, Error)]
 pub enum JwsDecodeError {
-    #[error(transparent)]
-    SignerError(#[from] SignerError),
-    #[error("InvalidJws : {0}")]
-    InvalidJws(String),
-    #[error(transparent)]
-    Base64UrlError(#[from] runtime::base64_url::Base64UrlError),
+    #[error("DecodeError: {0}")]
+    DecodeError(#[from] data_encoding::DecodeError),
     #[error(transparent)]
     JsonParseError(#[from] serde_json::Error),
+    #[error("invalid signature length: {0}")]
+    InvalidSignatureLength(usize),
     #[error("InvalidAlgorithm: {0}")]
     InvalidAlgorithm(String),
     #[error("b64 option is not supported")]
@@ -41,86 +39,88 @@ pub enum JwsDecodeError {
     B64NotSupportedButContained,
     #[error("EmptyPayload")]
     EmptyPayload,
+    #[error("InvalidJws : {0}")]
+    InvalidJws(String),
+    #[error("CryptError: {0}")]
+    CryptError(#[from] k256::ecdsa::Error),
+    #[error("FromUtf8Error: {0}")]
+    FromUtf8Error(#[from] std::string::FromUtf8Error),
 }
 
-impl Jws {
-    pub fn encode(object: &Value, context: &Secp256k1) -> Result<String, JwsEncodeError> {
-        // NOTE: header
-        let header =
-            JWSHeader { alg: "ES256K".to_string(), b64: false, crit: vec!["b64".to_string()] };
-        let header = runtime::base64_url::Base64Url::encode(
-            json!(&header).to_string().as_bytes(),
-            &PaddingType::NoPadding,
-        );
+pub fn sign(object: &Value, secret_key: &k256::SecretKey) -> Result<String, JwsEncodeError> {
+    // NOTE: header
+    let header = JWSHeader { alg: "ES256K".to_string(), b64: false, crit: vec!["b64".to_string()] };
+    let header = serde_jcs::to_string(&header)?;
+    let header = BASE64URL_NOPAD.encode(header.as_bytes());
+    // NOTE: payload
+    let payload = BASE64URL_NOPAD.encode(object.to_string().as_bytes());
+    // NOTE: message
+    let message = [header.clone(), payload].join(".");
+    let message: &[u8] = message.as_bytes();
 
-        // NOTE: payload
-        let payload = runtime::base64_url::Base64Url::encode(
-            object.to_string().as_bytes(),
-            &PaddingType::NoPadding,
-        );
+    // NOTE: signature
+    let signing_key: SigningKey = secret_key.into();
+    let signature: Signature = signing_key.try_sign(message)?;
+    let signature = BASE64URL_NOPAD.encode(&signature.to_vec());
 
-        // NOTE: message
-        let message = [header.clone(), payload].join(".");
+    Ok([header, "".to_string(), signature].join("."))
+}
 
-        // NOTE: signature
-        let signature = Signer::sign(&message, context)?;
-        let signature = runtime::base64_url::Base64Url::encode(&signature, &PaddingType::NoPadding);
+pub fn verify(
+    object: &Value,
+    jws: &str,
+    public_key: &k256::PublicKey,
+) -> Result<(), JwsDecodeError> {
+    let split: Vec<String> = jws.split('.').map(|v| v.to_string()).collect();
 
-        Ok([header, "".to_string(), signature].join("."))
+    if split.len() != 3 {
+        return Err(JwsDecodeError::InvalidJws(jws.to_string()));
     }
 
-    pub fn verify(object: &Value, jws: &str, context: &Secp256k1) -> Result<bool, JwsDecodeError> {
-        let split: Vec<String> = jws.split('.').map(|v| v.to_string()).collect();
+    let _header = split[0].clone();
+    let __payload = split[1].clone();
+    let _signature = split[2].clone();
 
-        if split.len() != 3 {
-            return Err(JwsDecodeError::InvalidJws(jws.to_string()));
-        }
+    // NOTE: header
+    let decoded = BASE64URL_NOPAD.decode(_header.as_bytes())?;
+    let decoded = String::from_utf8(decoded)?;
+    let header = serde_json::from_str::<JWSHeader>(&decoded)?;
 
-        let _header = split[0].clone();
-        let __payload = split[1].clone();
-        let _signature = split[2].clone();
-
-        // NOTE: header
-        let decoded =
-            runtime::base64_url::Base64Url::decode_as_string(&_header, &PaddingType::NoPadding)?;
-        let header = serde_json::from_str::<JWSHeader>(&decoded)?;
-
-        if header.alg != *"ES256K" {
-            return Err(JwsDecodeError::InvalidAlgorithm(header.alg));
-        }
-        if header.b64 {
-            return Err(JwsDecodeError::B64NotSupported);
-        }
-        if header.crit.iter().all(|v| v != "b64") {
-            return Err(JwsDecodeError::B64NotSupportedButContained);
-        };
-
-        // NOTE: payload
-        if __payload != *"".to_string() {
-            return Err(JwsDecodeError::EmptyPayload);
-        }
-        let _payload = runtime::base64_url::Base64Url::encode(
-            object.to_string().as_bytes(),
-            &PaddingType::NoPadding,
-        );
-
-        // NOTE: message
-        let message = [_header, _payload].join(".");
-
-        // NOTE: signature
-        let signature =
-            runtime::base64_url::Base64Url::decode_as_bytes(&_signature, &PaddingType::NoPadding)?;
-
-        // NOTE: verify
-        Ok(Signer::verify(&message, &signature, context)?)
+    if header.alg != *"ES256K" {
+        return Err(JwsDecodeError::InvalidAlgorithm(header.alg));
     }
+    if header.b64 {
+        return Err(JwsDecodeError::B64NotSupported);
+    }
+    if header.crit.iter().all(|v| v != "b64") {
+        return Err(JwsDecodeError::B64NotSupportedButContained);
+    };
+
+    // NOTE: payload
+    if __payload != *"".to_string() {
+        return Err(JwsDecodeError::EmptyPayload);
+    }
+    let _payload = BASE64URL_NOPAD.encode(object.to_string().as_bytes());
+
+    // NOTE: message
+    let message = [_header, _payload].join(".");
+
+    // NOTE: signature
+    let signature = BASE64URL_NOPAD.decode(_signature.as_bytes())?;
+    if signature.len() != 64 {
+        return Err(JwsDecodeError::InvalidSignatureLength(signature.len()));
+    }
+    let r = GenericArray::from_slice(&signature[0..32]);
+    let s = GenericArray::from_slice(&signature[32..]);
+    let wrapped_signature = Signature::from_scalars(*r, *s)?;
+
+    let verify_key = VerifyingKey::from(public_key);
+    Ok(verify_key.verify(message.as_bytes(), &wrapped_signature)?)
 }
 
 #[cfg(test)]
 pub mod tests {
-
     use super::*;
-    use crate::keyring::{self};
 
     const SECRET_KEY: [u8; 32] = [
         0xc7, 0x39, 0x80, 0x5a, 0xb0, 0x3d, 0xa6, 0x2d, 0xdb, 0xe0, 0x33, 0x90, 0xac, 0xdf, 0x76,
@@ -146,25 +146,17 @@ pub mod tests {
 
     #[test]
     pub fn test_encode() {
-        let context =
-            keyring::secp256k1::Secp256k1::new(PUBLIC_KEY.to_vec(), SECRET_KEY.to_vec()).unwrap();
-
+        let sk = k256::SecretKey::from_slice(&SECRET_KEY).unwrap();
         let json: Value = serde_json::from_str(&message()).unwrap();
-
-        let result = Jws::encode(&json, &context).unwrap();
+        let result = sign(&json, &sk).unwrap();
 
         assert_eq!(result, signature())
     }
 
     #[test]
     pub fn test_verify() {
-        let context =
-            keyring::secp256k1::Secp256k1::new(PUBLIC_KEY.to_vec(), SECRET_KEY.to_vec()).unwrap();
-
+        let pk = k256::PublicKey::from_sec1_bytes(&PUBLIC_KEY).unwrap();
         let json: Value = serde_json::from_str(&message()).unwrap();
-
-        let result = Jws::verify(&json, &signature(), &context).unwrap();
-
-        assert!(result)
+        let _ = verify(&json, &signature(), &pk).unwrap();
     }
 }
