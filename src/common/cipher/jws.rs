@@ -8,6 +8,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use thiserror::Error;
 
+// TODO: Design the interface to have an implementation with accelerators.
+
 #[derive(Debug, Serialize, Deserialize)]
 struct JWSHeader {
     alg: String,

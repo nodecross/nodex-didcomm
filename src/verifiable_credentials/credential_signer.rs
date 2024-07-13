@@ -1,5 +1,4 @@
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
 use serde_json::json;
 use thiserror::Error;
 
@@ -9,12 +8,6 @@ use crate::{
     keyring::keypair::{K256KeyPair, KeyPair},
     verifiable_credentials::types::VerifiableCredentials,
 };
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ProofContext {
-    #[serde(rename = "proof")]
-    pub proof: Option<Proof>,
-}
 
 pub struct CredentialSignerSuite<'a> {
     pub did: &'a str,
