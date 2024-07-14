@@ -22,10 +22,11 @@ pub enum KeyPairingError {
 }
 
 pub trait KeyPair<S, P>: Sized {
+    type Error: std::error::Error;
     fn get_secret_key(&self) -> S;
     fn get_public_key(&self) -> P;
     fn to_hex_key_pair(&self) -> HexKeyPair;
-    fn from_hex_key_pair(kp: &HexKeyPair) -> Result<Self, KeyPairingError>;
+    fn from_hex_key_pair(kp: &HexKeyPair) -> Result<Self, Self::Error>;
 }
 
 #[derive(Clone)]
@@ -42,6 +43,7 @@ impl K256KeyPair {
 }
 
 impl KeyPair<k256::SecretKey, k256::PublicKey> for K256KeyPair {
+    type Error = KeyPairingError;
     fn get_secret_key(&self) -> k256::SecretKey {
         self.secret_key.clone()
     }
@@ -80,6 +82,7 @@ impl X25519KeyPair {
 }
 
 impl KeyPair<x25519_dalek::StaticSecret, x25519_dalek::PublicKey> for X25519KeyPair {
+    type Error = KeyPairingError;
     fn get_secret_key(&self) -> x25519_dalek::StaticSecret {
         self.secret_key.clone()
     }
