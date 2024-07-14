@@ -38,8 +38,6 @@ pub enum FindIdentifierError {
     SidetreeRequestFailed(anyhow::Error),
     #[error("Failed to parse body: {0}")]
     BodyParseError(#[from] serde_json::Error),
-    #[error(transparent)]
-    Other(#[from] anyhow::Error),
 }
 
 impl From<HttpError> for FindIdentifierError {
@@ -63,7 +61,7 @@ pub enum GetPublicKeyError {
 }
 
 #[async_trait::async_trait]
-pub trait DidRepository {
+pub trait DidRepository: Sync {
     async fn create_identifier(
         &self,
         keyring: KeyPairing,

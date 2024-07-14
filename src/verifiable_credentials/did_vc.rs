@@ -1,5 +1,3 @@
-use std::marker::Sync;
-
 use chrono::{DateTime, Utc};
 use serde_json::Value;
 use thiserror::Error;
@@ -16,36 +14,55 @@ use crate::{
     },
 };
 
-#[derive(Clone)]
-pub struct DIDVCService<R: DidRepository + Sync> {
-    pub(crate) did_repository: R,
+#[async_trait::async_trait]
+pub trait DidVcService: Sync {
+    fn generate(
+        &self,
+        from_did: &str,
+        from_keyring: &keypair::KeyPairing,
+        message: &Value,
+        issuance_date: DateTime<Utc>,
+    ) -> Result<VerifiableCredentials, DidVcServiceGenerateError>;
+    async fn verify(
+        &self,
+        model: VerifiableCredentials,
+    ) -> Result<VerifiableCredentials, DidVcServiceVerifyError>;
 }
 
 #[derive(Debug, Error)]
-pub enum DIDVCServiceGenerateError {
+pub enum DidVcServiceGenerateError {
     #[error("credential signer error")]
     SignFailed(#[from] CredentialSignerSignError),
 }
 
 #[derive(Debug, Error)]
-pub enum DIDVCServiceVerifyError {
+pub enum DidVcServiceVerifyError {
     #[error("did public key not found. did: {0}")]
     PublicKeyNotFound(#[from] GetPublicKeyError),
     #[error("credential signer error")]
     VerifyFailed(#[from] CredentialSignerVerifyError),
 }
 
-impl<R: DidRepository + Sync> DIDVCService<R> {
+#[derive(Clone)]
+pub struct DidVcServiceImpl<R: DidRepository> {
+    pub(crate) did_repository: R,
+}
+
+impl<R: DidRepository> DidVcServiceImpl<R> {
     pub fn new(did_repository: R) -> Self {
         Self { did_repository }
     }
-    pub fn generate(
+}
+
+#[async_trait::async_trait]
+impl<R: DidRepository> DidVcService for DidVcServiceImpl<R> {
+    fn generate(
         &self,
         from_did: &str,
         from_keyring: &keypair::KeyPairing,
         message: &Value,
         issuance_date: DateTime<Utc>,
-    ) -> Result<VerifiableCredentials, DIDVCServiceGenerateError> {
+    ) -> Result<VerifiableCredentials, DidVcServiceGenerateError> {
         let r#type = "VerifiableCredential".to_string();
         let context = "https://www.w3.org/2018/credentials/v1".to_string();
 
@@ -73,10 +90,10 @@ impl<R: DidRepository + Sync> DIDVCService<R> {
         Ok(signed)
     }
 
-    pub async fn verify(
+    async fn verify(
         &self,
         model: VerifiableCredentials,
-    ) -> Result<VerifiableCredentials, DIDVCServiceVerifyError> {
+    ) -> Result<VerifiableCredentials, DidVcServiceVerifyError> {
         let public_key = self.did_repository.get_sign_key(&model.issuer.id).await?;
         Ok(CredentialSigner::verify(model, &public_key)?)
     }
@@ -106,7 +123,7 @@ mod tests {
             from_keyring.clone(),
         )]));
 
-        let service = DIDVCService::new(mock_repository);
+        let service = DidVcServiceImpl::new(mock_repository);
 
         let message = json!({"test": "0123456789abcdef"});
         let issuance_date = Utc::now();
@@ -133,7 +150,7 @@ mod tests {
             message: &Value,
             issuance_date: DateTime<Utc>,
         ) -> VerifiableCredentials {
-            let service = DIDVCService::new(MockDidRepository::from_single(BTreeMap::new()));
+            let service = DidVcServiceImpl::new(MockDidRepository::from_single(BTreeMap::new()));
 
             service.generate(from_did, from_keyring, message, issuance_date).unwrap()
         }
@@ -144,7 +161,7 @@ mod tests {
 
             let mock_repository = MockDidRepository::from_single(BTreeMap::new());
 
-            let service = DIDVCService::new(mock_repository);
+            let service = DidVcServiceImpl::new(mock_repository);
 
             let model = create_did_vc(
                 &from_did,
@@ -155,7 +172,7 @@ mod tests {
 
             let res = service.verify(model).await.unwrap_err();
 
-            if let DIDVCServiceVerifyError::PublicKeyNotFound(GetPublicKeyError::DidDocNotFound(
+            if let DidVcServiceVerifyError::PublicKeyNotFound(GetPublicKeyError::DidDocNotFound(
                 _,
             )) = res
             {
@@ -176,11 +193,11 @@ mod tests {
             );
 
             let mock_repository = NoPublicKeyDidRepository;
-            let service = DIDVCService::new(mock_repository);
+            let service = DidVcServiceImpl::new(mock_repository);
 
             let res = service.verify(model).await.unwrap_err();
 
-            if let DIDVCServiceVerifyError::PublicKeyNotFound(_) = res {
+            if let DidVcServiceVerifyError::PublicKeyNotFound(_) = res {
             } else {
                 panic!("unexpected error: {:?}", res);
             }
@@ -203,11 +220,11 @@ mod tests {
                 from_did.clone(),
                 KeyPairing::create_keyring(OsRng),
             )]));
-            let service = DIDVCService::new(mock_repository);
+            let service = DidVcServiceImpl::new(mock_repository);
 
             let res = service.verify(model).await.unwrap_err();
 
-            if let DIDVCServiceVerifyError::VerifyFailed(_) = res {
+            if let DidVcServiceVerifyError::VerifyFailed(_) = res {
             } else {
                 panic!("unexpected error: {:?}", res);
             }
@@ -225,11 +242,11 @@ mod tests {
             );
 
             let mock_repository = IllegalPublicKeyLengthDidRepository;
-            let service = DIDVCService::new(mock_repository);
+            let service = DidVcServiceImpl::new(mock_repository);
 
             let res = service.verify(model).await.unwrap_err();
 
-            if let DIDVCServiceVerifyError::PublicKeyNotFound(_) = res {
+            if let DidVcServiceVerifyError::PublicKeyNotFound(_) = res {
             } else {
                 panic!("unexpected error: {:?}", res);
             }
@@ -250,11 +267,11 @@ mod tests {
                 from_did.clone(),
                 KeyPairing::create_keyring(OsRng),
             )]));
-            let service = DIDVCService::new(mock_repository);
+            let service = DidVcServiceImpl::new(mock_repository);
 
             let res = service.verify(model).await.unwrap_err();
 
-            if let DIDVCServiceVerifyError::VerifyFailed(_) = res {
+            if let DidVcServiceVerifyError::VerifyFailed(_) = res {
             } else {
                 panic!("unexpected error: {:?}", res);
             }

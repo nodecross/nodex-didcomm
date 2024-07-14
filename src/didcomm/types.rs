@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
-pub struct DIDCommMessage {
+pub struct DidCommMessage {
     pub ciphertext: String,
     pub iv: String,
     pub protected: String,
@@ -46,7 +46,7 @@ pub enum FindSenderError {
     SkidError,
 }
 
-impl DIDCommMessage {
+impl DidCommMessage {
     pub fn find_receivers(&self) -> Vec<String> {
         self.recipients.iter().map(|v| v.header.kid.clone()).collect()
     }
@@ -80,7 +80,7 @@ mod tests {
 
     #[test]
     fn extract_from_did() {
-        let message: DIDCommMessage = serde_json::from_str(MESSAGE).unwrap();
+        let message: DidCommMessage = serde_json::from_str(MESSAGE).unwrap();
         let result = message.find_sender().unwrap();
         assert_eq!(&result, FROM_DID);
     }
@@ -88,14 +88,14 @@ mod tests {
     #[test]
     fn extract_from_did_when_invalid_base64() {
         let message = include_str!("../../test_resources/invalid_didcomm_message.json");
-        let message: DIDCommMessage = serde_json::from_str(message).unwrap();
+        let message: DidCommMessage = serde_json::from_str(message).unwrap();
         let result = message.find_sender();
         assert!(result.is_err());
     }
 
     #[test]
     fn extract_to_did() {
-        let message: DIDCommMessage = serde_json::from_str(MESSAGE).unwrap();
+        let message: DidCommMessage = serde_json::from_str(MESSAGE).unwrap();
         let result = message.find_receivers();
         let expected_did = vec![TO_DID.to_string()];
         assert_eq!(result, expected_did);
