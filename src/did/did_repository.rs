@@ -3,55 +3,42 @@ use std::convert::TryInto;
 use http::StatusCode;
 
 use super::sidetree::{
-    client::{HttpError, SidetreeHttpClient},
-    payload::{did_create_payload, DIDReplacePayload, ToPublicKey},
-};
-use crate::{
-    did::sidetree::payload::DIDResolutionResponse,
-    keyring::{
-        jwk::Jwk,
-        keypair::{KeyPair, KeyPairing},
+    client::SidetreeHttpClient,
+    payload::{
+        did_create_payload, DidDocument, DidReplacePayload, DidResolutionResponse, ToPublicKey,
     },
+};
+use crate::keyring::{
+    jwk::Jwk,
+    keypair::{KeyPair, KeyPairing},
 };
 
 #[derive(Debug, thiserror::Error)]
-pub enum CreateIdentifierError {
+pub enum CreateIdentifierError<StudioClientError: std::error::Error> {
     #[error("Failed to convert to JWK")]
     JwkError,
     #[error("Failed to build operation payload: {0}")]
-    PayloadBuildFailed(#[from] crate::did::sidetree::payload::DIDCreatePayloadError),
+    PayloadBuildFailed(#[from] crate::did::sidetree::payload::DidCreatePayloadError),
     #[error("Failed to parse body: {0}")]
     BodyParseError(#[from] serde_json::Error),
-    #[error("Failed to send request to sidetree: {0}")]
-    SidetreeRequestFailed(anyhow::Error),
-}
-
-impl From<HttpError> for CreateIdentifierError {
-    fn from(HttpError::Inner(e): HttpError) -> Self {
-        Self::SidetreeRequestFailed(e)
-    }
+    #[error("Failed to create identifier. response: {0}")]
+    SidetreeRequestFailed(String),
+    #[error("Failed to send request: {0}")]
+    SidetreeHttpClientError(StudioClientError),
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum FindIdentifierError {
+pub enum FindIdentifierError<StudioClientError: std::error::Error> {
     #[error("Failed to send request to sidetree: {0}")]
-    SidetreeRequestFailed(anyhow::Error),
+    SidetreeRequestFailed(String),
     #[error("Failed to parse body: {0}")]
     BodyParseError(#[from] serde_json::Error),
-}
-
-impl From<HttpError> for FindIdentifierError {
-    fn from(HttpError::Inner(e): HttpError) -> Self {
-        Self::SidetreeRequestFailed(e)
-    }
+    #[error("Failed to send request: {0}")]
+    SidetreeHttpClientError(StudioClientError),
 }
 
 #[derive(Debug, thiserror::Error)]
 pub enum GetPublicKeyError {
-    #[error("Failed to find indentifier: {0}")]
-    FindIdentifierError(#[from] FindIdentifierError),
-    #[error("Failed to get did document: {0}")]
-    DidDocNotFound(String),
     #[error("Failed to get public key")]
     PublicKeyNotFound(String),
     #[error("Failed to convert from JWK: {0}")]
@@ -60,47 +47,40 @@ pub enum GetPublicKeyError {
     JwkToX25519Error(#[from] crate::keyring::jwk::JwkToX25519Error),
 }
 
+fn get_key(key_type: &str, did_document: &DidDocument) -> Result<Jwk, GetPublicKeyError> {
+    let did = &did_document.id;
+    let public_key = did_document
+        .public_key
+        .clone()
+        .and_then(|pks| pks.into_iter().find(|pk| pk.id == key_type))
+        .ok_or(GetPublicKeyError::PublicKeyNotFound(did.to_string()))?;
+    Ok(public_key.public_key_jwk)
+}
+
+pub fn get_sign_key(did_document: &DidDocument) -> Result<k256::PublicKey, GetPublicKeyError> {
+    let public_key = get_key("signingKey", &did_document)?;
+    Ok(public_key.try_into()?)
+}
+
+pub fn get_encrypt_key(
+    did_document: &DidDocument,
+) -> Result<x25519_dalek::PublicKey, GetPublicKeyError> {
+    let public_key = get_key("encryptionKey", &did_document)?;
+    Ok(public_key.try_into()?)
+}
+
 #[async_trait::async_trait]
 pub trait DidRepository: Sync {
+    type CreateIdentifierError: std::error::Error;
+    type FindIdentifierError: std::error::Error;
     async fn create_identifier(
         &self,
         keyring: KeyPairing,
-    ) -> Result<DIDResolutionResponse, CreateIdentifierError>;
+    ) -> Result<DidResolutionResponse, Self::CreateIdentifierError>;
     async fn find_identifier(
         &self,
         did: &str,
-    ) -> Result<Option<DIDResolutionResponse>, FindIdentifierError>;
-    async fn get_sign_key(&self, did: &str) -> Result<k256::PublicKey, GetPublicKeyError> {
-        let did_document = self.find_identifier(did).await?;
-        let public_keys = did_document
-            .ok_or(GetPublicKeyError::DidDocNotFound(did.to_string()))?
-            .did_document
-            .public_key
-            .ok_or(GetPublicKeyError::PublicKeyNotFound(did.to_string()))?;
-        let public_key = public_keys
-            .iter()
-            .find(|pk| pk.id == "signingKey")
-            .ok_or(GetPublicKeyError::PublicKeyNotFound(did.to_string()))?;
-        let public_key: k256::PublicKey = public_key.public_key_jwk.clone().try_into()?;
-        Ok(public_key)
-    }
-    async fn get_encrypt_key(
-        &self,
-        did: &str,
-    ) -> Result<x25519_dalek::PublicKey, GetPublicKeyError> {
-        let did_document = self.find_identifier(did).await?;
-        let public_keys = did_document
-            .ok_or(GetPublicKeyError::DidDocNotFound(did.to_string()))?
-            .did_document
-            .public_key
-            .ok_or(GetPublicKeyError::PublicKeyNotFound(did.to_string()))?;
-        let public_key = public_keys
-            .iter()
-            .find(|pk| pk.id == "encryptionKey")
-            .ok_or(GetPublicKeyError::PublicKeyNotFound(did.to_string()))?;
-        let public_key: x25519_dalek::PublicKey = public_key.public_key_jwk.clone().try_into()?;
-        Ok(public_key)
-    }
+    ) -> Result<Option<DidResolutionResponse>, Self::FindIdentifierError>;
 }
 
 pub struct DidRepositoryImpl<C: SidetreeHttpClient + Send + Sync> {
@@ -124,10 +104,12 @@ impl<C: SidetreeHttpClient + Send + Sync> DidRepositoryImpl<C> {
 
 #[async_trait::async_trait]
 impl<C: SidetreeHttpClient + Send + Sync> DidRepository for DidRepositoryImpl<C> {
+    type CreateIdentifierError = CreateIdentifierError<C::Error>;
+    type FindIdentifierError = FindIdentifierError<C::Error>;
     async fn create_identifier(
         &self,
         keyring: KeyPairing,
-    ) -> Result<DIDResolutionResponse, CreateIdentifierError> {
+    ) -> Result<DidResolutionResponse, CreateIdentifierError<C::Error>> {
         // https://w3c.github.io/did-spec-registries/#assertionmethod
         let sign = keyring
             .sign
@@ -158,34 +140,36 @@ impl<C: SidetreeHttpClient + Send + Sync> DidRepository for DidRepositoryImpl<C>
             .try_into()
             .map_err(|_| CreateIdentifierError::JwkError)?;
         let document =
-            DIDReplacePayload { public_keys: vec![sign, enc], service_endpoints: vec![] };
+            DidReplacePayload { public_keys: vec![sign, enc], service_endpoints: vec![] };
         let payload = did_create_payload(document, &update, &recovery)?;
 
-        let response = self.client.post_create_identifier(&payload).await?;
+        let response = self
+            .client
+            .post_create_identifier(&payload)
+            .await
+            .map_err(CreateIdentifierError::SidetreeHttpClientError)?;
         if response.status_code.is_success() {
             let response = serde_json::from_str(&response.body)?;
             Ok(response)
         } else {
-            Err(CreateIdentifierError::SidetreeRequestFailed(anyhow::anyhow!(
-                "Failed to create identifier. response: {:?}",
-                response
-            )))
+            Err(CreateIdentifierError::SidetreeRequestFailed(format!("{:?}", response)))
         }
     }
 
     async fn find_identifier(
         &self,
         did: &str,
-    ) -> Result<Option<DIDResolutionResponse>, FindIdentifierError> {
-        let response = self.client.get_find_identifier(did).await?;
+    ) -> Result<Option<DidResolutionResponse>, FindIdentifierError<C::Error>> {
+        let response = self
+            .client
+            .get_find_identifier(did)
+            .await
+            .map_err(FindIdentifierError::SidetreeHttpClientError)?;
 
         match response.status_code {
             StatusCode::OK => Ok(Some(serde_json::from_str(&response.body)?)),
             StatusCode::NOT_FOUND => Ok(None),
-            _ => Err(FindIdentifierError::SidetreeRequestFailed(anyhow::anyhow!(
-                "Failed to find identifier. response: {:?}",
-                response
-            ))),
+            _ => Err(FindIdentifierError::SidetreeRequestFailed(format!("{:?}", response))),
         }
     }
 }
@@ -196,7 +180,7 @@ pub mod mocks {
 
     use super::*;
     use crate::{
-        did::sidetree::payload::{DIDDocument, DidPublicKey, MethodMetadata},
+        did::sidetree::payload::{DidDocument, DidPublicKey, MethodMetadata},
         keyring::keypair::KeyPairing,
     };
 
@@ -215,18 +199,23 @@ pub mod mocks {
         }
     }
 
+    #[derive(Debug, thiserror::Error)]
+    pub enum DummyError {}
+
     #[async_trait::async_trait]
     impl DidRepository for MockDidRepository {
+        type CreateIdentifierError = CreateIdentifierError<DummyError>;
+        type FindIdentifierError = FindIdentifierError<DummyError>;
         async fn create_identifier(
             &self,
             _keyring: KeyPairing,
-        ) -> Result<DIDResolutionResponse, CreateIdentifierError> {
+        ) -> Result<DidResolutionResponse, Self::CreateIdentifierError> {
             unimplemented!()
         }
         async fn find_identifier(
             &self,
             did: &str,
-        ) -> Result<Option<DIDResolutionResponse>, FindIdentifierError> {
+        ) -> Result<Option<DidResolutionResponse>, Self::FindIdentifierError> {
             if let Some(keyrings) = self.map.get(did) {
                 let public_keys = keyrings
                     .iter()
@@ -252,9 +241,9 @@ pub mod mocks {
                     })
                     .collect();
 
-                let response = DIDResolutionResponse {
+                let response = DidResolutionResponse {
                     context: "https://www.w3.org/ns/did-resolution/v1".to_string(),
-                    did_document: DIDDocument {
+                    did_document: DidDocument {
                         id: did.to_string(),
                         public_key: Some(public_keys),
                         service: None,
@@ -278,19 +267,21 @@ pub mod mocks {
 
     #[async_trait::async_trait]
     impl DidRepository for NoPublicKeyDidRepository {
+        type CreateIdentifierError = CreateIdentifierError<DummyError>;
+        type FindIdentifierError = FindIdentifierError<DummyError>;
         async fn create_identifier(
             &self,
             _keyring: KeyPairing,
-        ) -> Result<DIDResolutionResponse, CreateIdentifierError> {
+        ) -> Result<DidResolutionResponse, Self::CreateIdentifierError> {
             unimplemented!()
         }
         async fn find_identifier(
             &self,
             did: &str,
-        ) -> Result<Option<DIDResolutionResponse>, FindIdentifierError> {
-            Ok(Some(DIDResolutionResponse {
+        ) -> Result<Option<DidResolutionResponse>, Self::FindIdentifierError> {
+            Ok(Some(DidResolutionResponse {
                 context: "https://www.w3.org/ns/did-resolution/v1".to_string(),
-                did_document: DIDDocument {
+                did_document: DidDocument {
                     id: did.to_string(),
                     public_key: None,
                     service: None,
@@ -310,19 +301,21 @@ pub mod mocks {
 
     #[async_trait::async_trait]
     impl DidRepository for IllegalPublicKeyLengthDidRepository {
+        type CreateIdentifierError = CreateIdentifierError<DummyError>;
+        type FindIdentifierError = FindIdentifierError<DummyError>;
         async fn create_identifier(
             &self,
             _keyring: KeyPairing,
-        ) -> Result<DIDResolutionResponse, CreateIdentifierError> {
+        ) -> Result<DidResolutionResponse, Self::CreateIdentifierError> {
             unimplemented!()
         }
         async fn find_identifier(
             &self,
             did: &str,
-        ) -> Result<Option<DIDResolutionResponse>, FindIdentifierError> {
-            Ok(Some(DIDResolutionResponse {
+        ) -> Result<Option<DidResolutionResponse>, Self::FindIdentifierError> {
+            Ok(Some(DidResolutionResponse {
                 context: "https://www.w3.org/ns/did-resolution/v1".to_string(),
-                did_document: DIDDocument {
+                did_document: DidDocument {
                     id: did.to_string(),
                     public_key: Some(vec![]),
                     service: None,

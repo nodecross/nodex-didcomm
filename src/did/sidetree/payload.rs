@@ -47,7 +47,7 @@ struct Authentication {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct DIDDocument {
+pub struct DidDocument {
     // TODO: impl parser for mixed type
     // #[serde(rename = "@context")]
     // context: String,
@@ -106,7 +106,7 @@ where
 
 // ACTION: replace
 #[derive(Debug, Serialize, Deserialize)]
-pub struct DIDReplacePayload {
+pub struct DidReplacePayload {
     #[serde(rename = "public_keys")]
     pub public_keys: Vec<PublicKeyPayload>,
 
@@ -115,32 +115,32 @@ pub struct DIDReplacePayload {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct DIDReplaceAction {
+struct DidReplaceAction {
     action: String, // 'replace',
-    document: DIDReplacePayload,
+    document: DidReplacePayload,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-struct DIDReplaceDeltaObject {
-    patches: Vec<DIDReplaceAction>,
+struct DidReplaceDeltaObject {
+    patches: Vec<DidReplaceAction>,
     update_commitment: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct DIDReplaceSuffixObject {
+struct DidReplaceSuffixObject {
     delta_hash: String,
     recovery_commitment: String,
 }
 
 // ACTION: ietf-json-patch
 #[allow(dead_code)]
-struct DIDIetfJsonPatchAction {
+struct DidIetfJsonPatchAction {
     action: String, /* 'replace',
                      * patches: Vec<> */
 }
 
 #[allow(dead_code)]
-struct DIDResolutionRequest {
+struct DidResolutionRequest {
     did: String,
 }
 
@@ -157,12 +157,12 @@ pub struct MethodMetadata {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct DIDResolutionResponse {
+pub struct DidResolutionResponse {
     #[serde(rename = "@context")]
     pub context: String,
 
     #[serde(rename = "didDocument")]
-    pub did_document: DIDDocument,
+    pub did_document: DidDocument,
 
     #[serde(rename = "methodMetadata")]
     pub method_metadata: MethodMetadata,
@@ -178,7 +178,7 @@ pub struct CommitmentKeys {
 }
 
 #[derive(Clone, Serialize, Deserialize)]
-pub struct DIDCreateRequest {
+pub struct DidCreateRequest {
     #[serde(rename = "publicKeys")]
     pub public_keys: Vec<PublicKeyPayload>,
 
@@ -190,26 +190,26 @@ pub struct DIDCreateRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct DIDCreatePayload {
+struct DidCreatePayload {
     r#type: String, // 'create',
     delta: String,
     suffix_data: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct DIDCreateResponse {
+pub struct DidCreateResponse {
     #[serde(rename = "@context")]
     pub context: String,
 
     #[serde(rename = "didDocument")]
-    pub did_document: DIDDocument,
+    pub did_document: DidDocument,
 
     #[serde(rename = "methodMetadata")]
     pub method_metadata: MethodMetadata,
 }
 
 #[derive(Debug, Error)]
-pub enum DIDCreatePayloadError {
+pub enum DidCreatePayloadError {
     #[error(transparent)]
     SerdeJsonError(#[from] serde_json::Error),
 }
@@ -223,25 +223,25 @@ where
 }
 
 pub fn did_create_payload(
-    replace_payload: DIDReplacePayload,
+    replace_payload: DidReplacePayload,
     update_key: &Jwk,
     recovery_key: &Jwk,
-) -> Result<String, DIDCreatePayloadError> {
+) -> Result<String, DidCreatePayloadError> {
     let update = canon(update_key)?;
     let update_commitment = multihash::double_hash_encode(&update);
     let recovery = canon(recovery_key)?;
     let recovery_commitment = multihash::double_hash_encode(&recovery);
-    let patch = DIDReplaceAction { action: "replace".to_string(), document: replace_payload };
-    let delta = DIDReplaceDeltaObject { patches: vec![patch], update_commitment };
+    let patch = DidReplaceAction { action: "replace".to_string(), document: replace_payload };
+    let delta = DidReplaceDeltaObject { patches: vec![patch], update_commitment };
     let delta = canon(&delta)?;
     let delta_hash = multihash::hash_encode(&delta);
 
-    let suffix = DIDReplaceSuffixObject { delta_hash, recovery_commitment };
+    let suffix = DidReplaceSuffixObject { delta_hash, recovery_commitment };
     let suffix = canon(&suffix)?;
     let encoded_delta = BASE64URL_NOPAD.encode(&delta);
     let encoded_suffix = BASE64URL_NOPAD.encode(&suffix);
 
-    let payload = DIDCreatePayload {
+    let payload = DidCreatePayload {
         r#type: "create".to_string(),
         delta: encoded_delta,
         suffix_data: encoded_suffix,
@@ -268,7 +268,7 @@ pub mod tests {
         let update: Jwk = keyring.recovery.get_public_key().try_into().unwrap();
         let recovery: Jwk = keyring.update.get_public_key().try_into().unwrap();
 
-        let document = DIDReplacePayload { public_keys: vec![public], service_endpoints: vec![] };
+        let document = DidReplacePayload { public_keys: vec![public], service_endpoints: vec![] };
 
         let _result = did_create_payload(document, &update, &recovery).unwrap();
     }

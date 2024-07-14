@@ -48,7 +48,7 @@ mod tests {
     }
 
     #[test]
-    fn test_canonicalize_then_double_hash_then_encode() {
+    fn test_double_hash_then_encode() {
         let result = double_hash_encode(message().as_bytes());
         assert_eq!(result, String::from("EiC_GPLc6eWMwiyIuGr1oEWiSqrTufglVlDGco8oaQL_nQ"));
     }
