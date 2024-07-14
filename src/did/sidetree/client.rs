@@ -1,21 +1,5 @@
 use http::StatusCode;
 
-// This type isn't implement std::error::Error because of conflicting
-// implementations
-#[derive(Debug)]
-pub enum HttpError {
-    Inner(anyhow::Error),
-}
-
-impl<E> From<E> for HttpError
-where
-    E: std::error::Error + Send + Sync + 'static,
-{
-    fn from(e: E) -> Self {
-        Self::Inner(anyhow::Error::new(e))
-    }
-}
-
 #[derive(Clone, Debug)]
 pub struct SidetreeHttpClientResponse {
     pub(crate) status_code: StatusCode,
