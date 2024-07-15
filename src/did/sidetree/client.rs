@@ -6,20 +6,9 @@ pub struct SidetreeHttpClientResponse {
     pub(crate) body: String,
 }
 
-#[derive(Debug, thiserror::Error)]
-pub enum SidetreeResponseInitializationError {
-    #[error("Invalid status code: {0}")]
-    InvalidStatusCode(u16),
-}
-
 impl SidetreeHttpClientResponse {
-    pub fn new(
-        status_code: u16,
-        body: String,
-    ) -> Result<Self, SidetreeResponseInitializationError> {
-        let status_code = StatusCode::from_u16(status_code)
-            .map_err(|_| SidetreeResponseInitializationError::InvalidStatusCode(status_code))?;
-        Ok(Self { status_code, body })
+    pub fn new(status_code: StatusCode, body: String) -> Self {
+        Self { status_code, body }
     }
 }
 
