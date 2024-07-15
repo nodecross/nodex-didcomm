@@ -117,7 +117,10 @@ impl<C: SidetreeHttpClient + Send + Sync> DidRepository for DidRepositoryImpl<C>
             .to_public_key(
                 "EcdsaSecp256k1VerificationKey2019".to_string(),
                 "signingKey".to_string(),
-                vec!["assertionMethod".to_string()],
+                vec!["auth".to_string(), "general".to_string()]
+                // TODO: This purpose property is strange...
+                // https://identity.foundation/sidetree/spec/#add-public-keys
+                // vec!["assertionMethod".to_string()],
             )
             .map_err(|_| CreateIdentifierError::JwkError)?;
         let enc = keyring
@@ -126,7 +129,10 @@ impl<C: SidetreeHttpClient + Send + Sync> DidRepository for DidRepositoryImpl<C>
             .to_public_key(
                 "X25519KeyAgreementKey2019".to_string(),
                 "encryptionKey".to_string(),
-                vec!["keyAgreement".to_string()],
+                vec!["auth".to_string(), "general".to_string()]
+                // TODO: This purpose property is strange...
+                // https://identity.foundation/sidetree/spec/#add-public-keys
+                // vec!["keyAgreement".to_string()]
             )
             .map_err(|_| CreateIdentifierError::JwkError)?;
         let update: Jwk = keyring
