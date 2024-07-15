@@ -122,10 +122,11 @@ fn verify<R: DidRepository>(
 }
 
 #[derive(Debug, Error)]
-pub enum DidCommEncryptedServiceGenerateError<
+pub enum DidCommEncryptedServiceGenerateError<FindIdentifierError, DidVcServiceGenerateError>
+where
     FindIdentifierError: std::error::Error,
     DidVcServiceGenerateError: std::error::Error,
-> {
+{
     #[error("failed to get did document: {0}")]
     DidDocNotFound(String),
     #[error("did public key not found. did: {0}")]
