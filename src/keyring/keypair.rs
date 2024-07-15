@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Clone, Serialize, Deserialize)]
-pub struct HexKeyPair {
+pub struct KeyPairHex {
     // MEMO: Matching schema in NodeX config.
     public_key: String,
     secret_key: String,
@@ -25,8 +25,8 @@ pub trait KeyPair<S, P>: Sized {
     type Error: std::error::Error;
     fn get_secret_key(&self) -> S;
     fn get_public_key(&self) -> P;
-    fn to_hex_key_pair(&self) -> HexKeyPair;
-    fn from_hex_key_pair(kp: &HexKeyPair) -> Result<Self, Self::Error>;
+    fn to_hex_key_pair(&self) -> KeyPairHex;
+    fn from_hex_key_pair(kp: &KeyPairHex) -> Result<Self, Self::Error>;
 }
 
 #[derive(Clone)]
@@ -50,14 +50,14 @@ impl KeyPair<k256::SecretKey, k256::PublicKey> for K256KeyPair {
     fn get_public_key(&self) -> k256::PublicKey {
         self.public_key.clone()
     }
-    fn to_hex_key_pair(&self) -> HexKeyPair {
+    fn to_hex_key_pair(&self) -> KeyPairHex {
         let sk = self.secret_key.to_bytes();
         let secret_key = hex::encode(&sk);
         let pk = self.public_key.to_encoded_point(false);
         let public_key = hex::encode(pk.as_bytes());
-        HexKeyPair { secret_key, public_key }
+        KeyPairHex { secret_key, public_key }
     }
-    fn from_hex_key_pair(kp: &HexKeyPair) -> Result<Self, KeyPairingError> {
+    fn from_hex_key_pair(kp: &KeyPairHex) -> Result<Self, KeyPairingError> {
         let secret_key = hex::decode(&kp.secret_key)?;
         let secret_key =
             k256::SecretKey::from_slice(&secret_key).map_err(|_| KeyPairingError::CryptError)?;
@@ -89,14 +89,14 @@ impl KeyPair<x25519_dalek::StaticSecret, x25519_dalek::PublicKey> for X25519KeyP
     fn get_public_key(&self) -> x25519_dalek::PublicKey {
         self.public_key.clone()
     }
-    fn to_hex_key_pair(&self) -> HexKeyPair {
+    fn to_hex_key_pair(&self) -> KeyPairHex {
         let sk = self.secret_key.as_bytes();
         let secret_key = hex::encode(sk);
         let pk = self.public_key.as_bytes();
         let public_key = hex::encode(pk);
-        HexKeyPair { secret_key, public_key }
+        KeyPairHex { secret_key, public_key }
     }
-    fn from_hex_key_pair(kp: &HexKeyPair) -> Result<Self, KeyPairingError> {
+    fn from_hex_key_pair(kp: &KeyPairHex) -> Result<Self, KeyPairingError> {
         let secret_key = hex::decode(&kp.secret_key)?;
         let secret_key: [u8; 32] =
             secret_key.try_into().map_err(|_| KeyPairingError::CryptError)?;
@@ -119,11 +119,11 @@ pub struct KeyPairing {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct KeyPairingHex {
-    pub sign: HexKeyPair,
-    pub update: HexKeyPair,
+    pub sign: KeyPairHex,
+    pub update: KeyPairHex,
     // MEMO: Matching schema in NodeX config.
-    pub recover: HexKeyPair,
-    pub encrypt: HexKeyPair,
+    pub recover: KeyPairHex,
+    pub encrypt: KeyPairHex,
 }
 
 impl KeyPairing {
