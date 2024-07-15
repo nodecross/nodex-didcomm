@@ -58,14 +58,14 @@ fn get_key(key_type: &str, did_document: &DidDocument) -> Result<Jwk, GetPublicK
 }
 
 pub fn get_sign_key(did_document: &DidDocument) -> Result<k256::PublicKey, GetPublicKeyError> {
-    let public_key = get_key("signingKey", &did_document)?;
+    let public_key = get_key("#signingKey", &did_document)?;
     Ok(public_key.try_into()?)
 }
 
 pub fn get_encrypt_key(
     did_document: &DidDocument,
 ) -> Result<x25519_dalek::PublicKey, GetPublicKeyError> {
-    let public_key = get_key("encryptionKey", &did_document)?;
+    let public_key = get_key("#encryptionKey", &did_document)?;
     Ok(public_key.try_into()?)
 }
 
@@ -117,10 +117,10 @@ impl<C: SidetreeHttpClient + Send + Sync> DidRepository for DidRepositoryImpl<C>
             .to_public_key(
                 "EcdsaSecp256k1VerificationKey2019".to_string(),
                 "signingKey".to_string(),
-                vec!["auth".to_string(), "general".to_string()]
-                // TODO: This purpose property is strange...
-                // https://identity.foundation/sidetree/spec/#add-public-keys
-                // vec!["assertionMethod".to_string()],
+                vec!["auth".to_string(), "general".to_string()], /* TODO: This purpose property
+                                                                  * is strange... https://identity.foundation/sidetree/spec/#add-public-keys
+                                                                  * vec!["assertionMethod".
+                                                                  * to_string()], */
             )
             .map_err(|_| CreateIdentifierError::JwkError)?;
         let enc = keyring
@@ -129,10 +129,10 @@ impl<C: SidetreeHttpClient + Send + Sync> DidRepository for DidRepositoryImpl<C>
             .to_public_key(
                 "X25519KeyAgreementKey2019".to_string(),
                 "encryptionKey".to_string(),
-                vec!["auth".to_string(), "general".to_string()]
-                // TODO: This purpose property is strange...
-                // https://identity.foundation/sidetree/spec/#add-public-keys
-                // vec!["keyAgreement".to_string()]
+                vec!["auth".to_string(), "general".to_string()], /* TODO: This purpose property
+                                                                  * is strange... https://identity.foundation/sidetree/spec/#add-public-keys
+                                                                  * vec!["keyAgreement".
+                                                                  * to_string()] */
             )
             .map_err(|_| CreateIdentifierError::JwkError)?;
         let update: Jwk = keyring
@@ -228,13 +228,13 @@ pub mod mocks {
                     .flat_map(|keyring| {
                         vec![
                             DidPublicKey {
-                                id: "signingKey".to_string(),
+                                id: "#signingKey".to_string(),
                                 controller: String::new(),
                                 r#type: "EcdsaSecp256k1VerificationKey2019".to_string(),
                                 public_key_jwk: keyring.sign.get_public_key().try_into().unwrap(),
                             },
                             DidPublicKey {
-                                id: "encryptionKey".to_string(),
+                                id: "#encryptionKey".to_string(),
                                 controller: String::new(),
                                 r#type: "X25519KeyAgreementKey2019".to_string(),
                                 public_key_jwk: keyring
