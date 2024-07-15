@@ -71,8 +71,8 @@ pub fn get_encrypt_key(
 
 #[async_trait::async_trait]
 pub trait DidRepository: Sync {
-    type CreateIdentifierError: std::error::Error;
-    type FindIdentifierError: std::error::Error;
+    type CreateIdentifierError: std::error::Error + Send + Sync;
+    type FindIdentifierError: std::error::Error + Send + Sync;
     async fn create_identifier(
         &self,
         keyring: KeyPairing,

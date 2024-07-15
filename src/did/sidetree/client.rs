@@ -14,7 +14,7 @@ impl SidetreeHttpClientResponse {
 
 #[async_trait::async_trait]
 pub trait SidetreeHttpClient {
-    type Error: std::error::Error;
+    type Error: std::error::Error + Send + Sync;
     async fn post_create_identifier(
         &self,
         body: &str,
