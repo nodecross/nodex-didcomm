@@ -30,7 +30,6 @@ pub trait DidCommEncryptedService: Sync {
         message: &Value,
         metadata: Option<&Value>,
         issuance_date: DateTime<Utc>,
-        attachment_link: &str,
     ) -> Result<DidCommMessage, Self::GenerateError>;
     async fn verify(
         &self,
@@ -39,24 +38,22 @@ pub trait DidCommEncryptedService: Sync {
     ) -> Result<VerifiedContainer, Self::VerifyError>;
 }
 
-fn generate<R: DidRepository, V: DidVcService>(
+fn didcomm_generate<R: DidRepository, V: DidVcService>(
     from_did: &str,
     to_doc: &DidDocument,
     from_keyring: &KeyPairing,
-    metadata: Option<&Value>,
     body: &VerifiableCredentials,
+    metadata: Option<&Value>,
     attachment_link: &str,
 ) -> Result<
     DidCommMessage,
     DidCommEncryptedServiceGenerateError<R::FindIdentifierError, V::GenerateError>,
 > {
     let to_did = &to_doc.id;
-    // NOTE: message
     let body = serde_json::to_string(body)?;
 
     let mut message = Message::new().from(from_did).to(&[to_did]).body(&body)?;
 
-    // NOTE: Has attachment
     if let Some(value) = metadata {
         let id = cuid::cuid2();
 
@@ -69,7 +66,6 @@ fn generate<R: DidRepository, V: DidVcService>(
         )
     }
 
-    // NOTE: recipient to
     let public_key = get_encrypt_key(to_doc)?.as_bytes().to_vec();
     let public_key = Some(public_key);
 
@@ -80,7 +76,34 @@ fn generate<R: DidRepository, V: DidVcService>(
     Ok(serde_json::from_str::<DidCommMessage>(&seal_message)?)
 }
 
-fn verify<R: DidRepository>(
+async fn generate<R: DidRepository, V: DidVcService>(
+    did_repository: &R,
+    vc_service: &V,
+    from_did: &str,
+    to_did: &str,
+    from_keyring: &KeyPairing,
+    message: &Value,
+    metadata: Option<&Value>,
+    issuance_date: DateTime<Utc>,
+    attachment_link: &str,
+) -> Result<
+    DidCommMessage,
+    DidCommEncryptedServiceGenerateError<R::FindIdentifierError, V::GenerateError>,
+> {
+    let body = vc_service
+        .generate(from_did, from_keyring, message, issuance_date)
+        .map_err(DidCommEncryptedServiceGenerateError::VCServiceError)?;
+    let to_doc = did_repository
+        .find_identifier(to_did)
+        .await
+        .map_err(DidCommEncryptedServiceGenerateError::SidetreeFindRequestFailed)?
+        .ok_or(DidCommEncryptedServiceGenerateError::DidDocNotFound(to_did.to_string()))?
+        .did_document;
+
+    Ok(didcomm_generate::<R, V>(from_did, &to_doc, from_keyring, &body, metadata, attachment_link)?)
+}
+
+fn didcomm_verify<R: DidRepository>(
     from_doc: &DidDocument,
     my_keyring: &KeyPairing,
     message: &DidCommMessage,
@@ -105,7 +128,6 @@ fn verify<R: DidRepository>(
         .get_body()
         .map_err(|e| DidCommEncryptedServiceVerifyError::MetadataBodyNotFound(Some(e)))?;
     let body = serde_json::from_str::<VerifiableCredentials>(&body)?;
-    // let body = did_vc::verify(from_doc, body)?;
 
     match metadata {
         Some(metadata) => {
@@ -119,6 +141,26 @@ fn verify<R: DidRepository>(
         }
         None => Ok(VerifiedContainer { message: body, metadata: None }),
     }
+}
+
+async fn verify<R: DidRepository>(
+    did_repository: &R,
+    my_keyring: &KeyPairing,
+    message: &DidCommMessage,
+) -> Result<VerifiedContainer, DidCommEncryptedServiceVerifyError<R::FindIdentifierError>> {
+    let other_did = message.find_sender()?;
+    let other_doc = did_repository
+        .find_identifier(&other_did)
+        .await
+        .map_err(DidCommEncryptedServiceVerifyError::SidetreeFindRequestFailed)?
+        .ok_or(DidCommEncryptedServiceVerifyError::DidDocNotFound(other_did))?
+        .did_document;
+    let mut container = didcomm_verify::<R>(&other_doc, my_keyring, message)?;
+    // For performance, call low level api
+    let public_key = get_sign_key(&other_doc)?;
+    let body = CredentialSigner::verify(container.message, &public_key)?;
+    container.message = body;
+    Ok(container)
 }
 
 #[derive(Debug, Error)]
@@ -177,19 +219,19 @@ where
         message: &Value,
         metadata: Option<&Value>,
         issuance_date: DateTime<Utc>,
-        attachment_link: &str,
     ) -> Result<DidCommMessage, Self::GenerateError> {
-        // NOTE: message
-        let body = DidVcService::generate(self, from_did, from_keyring, message, issuance_date)
-            .map_err(Self::GenerateError::VCServiceError)?;
-        let to_doc = self
-            .find_identifier(to_did)
-            .await
-            .map_err(Self::GenerateError::SidetreeFindRequestFailed)?
-            .ok_or(Self::GenerateError::DidDocNotFound(to_did.to_string()))?
-            .did_document;
-
-        Ok(generate::<R, R>(from_did, &to_doc, from_keyring, metadata, &body, attachment_link)?)
+        generate::<R, R>(
+            self,
+            self,
+            from_did,
+            to_did,
+            from_keyring,
+            message,
+            metadata,
+            issuance_date,
+            "",
+        )
+        .await
     }
 
     async fn verify(
@@ -197,19 +239,64 @@ where
         my_keyring: &KeyPairing,
         message: &DidCommMessage,
     ) -> Result<VerifiedContainer, Self::VerifyError> {
-        let other_did = message.find_sender()?;
-        let other_doc = self
-            .find_identifier(&other_did)
-            .await
-            .map_err(Self::VerifyError::SidetreeFindRequestFailed)?
-            .ok_or(Self::VerifyError::DidDocNotFound(other_did))?
-            .did_document;
-        let mut container = verify::<R>(&other_doc, my_keyring, message)?;
-        // For performance, call low level api
-        let public_key = get_sign_key(&other_doc)?;
-        let body = CredentialSigner::verify(container.message, &public_key)?;
-        container.message = body;
-        Ok(container)
+        verify(self, my_keyring, message).await
+    }
+}
+
+pub struct DidCommServiceWithAttachment<R>
+where
+    R: DidRepository + DidVcService,
+{
+    vc_service: R,
+    attachment_link: String,
+}
+
+impl<R> DidCommServiceWithAttachment<R>
+where
+    R: DidRepository + DidVcService,
+{
+    pub fn new(did_repository: R, attachment_link: String) -> Self {
+        Self { vc_service: did_repository, attachment_link }
+    }
+}
+
+#[async_trait::async_trait]
+impl<R> DidCommEncryptedService for DidCommServiceWithAttachment<R>
+where
+    R: DidRepository + DidVcService,
+{
+    type GenerateError =
+        DidCommEncryptedServiceGenerateError<R::FindIdentifierError, R::GenerateError>;
+    type VerifyError = DidCommEncryptedServiceVerifyError<R::FindIdentifierError>;
+    async fn generate(
+        &self,
+        from_did: &str,
+        to_did: &str,
+        from_keyring: &KeyPairing,
+        message: &Value,
+        metadata: Option<&Value>,
+        issuance_date: DateTime<Utc>,
+    ) -> Result<DidCommMessage, Self::GenerateError> {
+        generate::<R, R>(
+            &self.vc_service,
+            &self.vc_service,
+            from_did,
+            to_did,
+            from_keyring,
+            message,
+            metadata,
+            issuance_date,
+            &self.attachment_link,
+        )
+        .await
+    }
+
+    async fn verify(
+        &self,
+        my_keyring: &KeyPairing,
+        message: &DidCommMessage,
+    ) -> Result<VerifiedContainer, Self::VerifyError> {
+        verify(&self.vc_service, my_keyring, message).await
     }
 }
 
@@ -217,12 +304,19 @@ where
 mod tests {
     use std::{collections::BTreeMap, iter::FromIterator as _};
 
+    use chrono::{DateTime, Utc};
     use rand_core::OsRng;
-    use serde_json::json;
+    use serde_json::{json, Value};
 
-    use super::*;
+    // use super::*;
+    use super::DidCommEncryptedService;
     use crate::{
-        did::did_repository::mocks::MockDidRepository, didcomm::test_utils::create_random_did,
+        did::did_repository::{mocks::MockDidRepository, GetPublicKeyError},
+        didcomm::{
+            encrypted::{DidCommEncryptedServiceGenerateError, DidCommEncryptedServiceVerifyError},
+            test_utils::create_random_did,
+            types::DidCommMessage,
+        },
         keyring::keypair::KeyPairing,
     };
 
@@ -242,20 +336,12 @@ mod tests {
         let message = json!({"test": "0123456789abcdef"});
         let issuance_date = Utc::now();
 
-        let res = DidCommEncryptedService::generate(
-            &repo,
-            &from_did,
-            &to_did,
-            &from_keyring,
-            &message,
-            None,
-            issuance_date,
-            "",
-        )
-        .await
-        .unwrap();
+        let res = repo
+            .generate(&from_did, &to_did, &from_keyring, &message, None, issuance_date)
+            .await
+            .unwrap();
 
-        let verified = DidCommEncryptedService::verify(&repo, &to_keyring, &res).await.unwrap();
+        let verified = repo.verify(&to_keyring, &res).await.unwrap();
         let verified = verified.message;
 
         assert_eq!(verified.issuer.id, from_did);
@@ -281,18 +367,10 @@ mod tests {
             let message = json!({"test": "0123456789abcdef"});
             let issuance_date = Utc::now();
 
-            let res = DidCommEncryptedService::generate(
-                &repo,
-                &from_did,
-                &to_did,
-                &from_keyring,
-                &message,
-                None,
-                issuance_date,
-                "",
-            )
-            .await
-            .unwrap_err();
+            let res = repo
+                .generate(&from_did, &to_did, &from_keyring, &message, None, issuance_date)
+                .await
+                .unwrap_err();
 
             if let DidCommEncryptedServiceGenerateError::DidDocNotFound(did) = res {
                 assert_eq!(did, to_did);
@@ -313,18 +391,10 @@ mod tests {
             let message = json!({"test": "0123456789abcdef"});
             let issuance_date = Utc::now();
 
-            let res = DidCommEncryptedService::generate(
-                &repo,
-                &from_did,
-                &to_did,
-                &from_keyring,
-                &message,
-                None,
-                issuance_date,
-                "",
-            )
-            .await
-            .unwrap_err();
+            let res = repo
+                .generate(&from_did, &to_did, &from_keyring, &message, None, issuance_date)
+                .await
+                .unwrap_err();
 
             if let DidCommEncryptedServiceGenerateError::DidPublicKeyNotFound(
                 GetPublicKeyError::PublicKeyNotFound(did),
@@ -355,18 +425,9 @@ mod tests {
                 to_keyring.clone(),
             )]));
 
-            DidCommEncryptedService::generate(
-                &repo,
-                &from_did,
-                &to_did,
-                &from_keyring,
-                &message,
-                metadata,
-                issuance_date,
-                "",
-            )
-            .await
-            .unwrap()
+            repo.generate(&from_did, &to_did, &from_keyring, &message, metadata, issuance_date)
+                .await
+                .unwrap()
         }
 
         #[actix_rt::test]
@@ -395,8 +456,7 @@ mod tests {
                 to_did.clone(),
                 to_keyring.clone(),
             )]));
-            let res =
-                DidCommEncryptedService::verify(&repo, &from_keyring, &res).await.unwrap_err();
+            let res = repo.verify(&from_keyring, &res).await.unwrap_err();
 
             if let DidCommEncryptedServiceVerifyError::DidDocNotFound(did) = res {
                 assert_eq!(did, from_did);
@@ -435,8 +495,7 @@ mod tests {
                 (other_did.clone(), other_keyring.clone()),
             ]));
 
-            let res =
-                DidCommEncryptedService::verify(&repo, &other_keyring, &res).await.unwrap_err();
+            let res = repo.verify(&other_keyring, &res).await.unwrap_err();
 
             if let DidCommEncryptedServiceVerifyError::DecryptFailed(_) = res {
             } else {
@@ -468,8 +527,7 @@ mod tests {
 
             let repo = NoPublicKeyDidRepository;
 
-            let res =
-                DidCommEncryptedService::verify(&repo, &from_keyring, &res).await.unwrap_err();
+            let res = repo.verify(&from_keyring, &res).await.unwrap_err();
 
             if let DidCommEncryptedServiceVerifyError::DidPublicKeyNotFound(
                 GetPublicKeyError::PublicKeyNotFound(did),
