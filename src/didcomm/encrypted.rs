@@ -44,7 +44,7 @@ fn didcomm_generate<R: DidRepository, V: DidVcService>(
     from_keyring: &KeyPairing,
     body: &VerifiableCredentials,
     metadata: Option<&Value>,
-    attachment_link: &str,
+    attachment_link: Option<&str>,
 ) -> Result<
     DidCommMessage,
     DidCommEncryptedServiceGenerateError<R::FindIdentifierError, V::GenerateError>,
@@ -58,8 +58,13 @@ fn didcomm_generate<R: DidRepository, V: DidVcService>(
         let id = cuid::cuid2();
 
         // let media_type = "application/json";
-        let data =
-            AttachmentDataBuilder::new().with_link(attachment_link).with_json(&value.to_string());
+        let data = AttachmentDataBuilder::new().with_json(&value.to_string());
+
+        let data = if let Some(attachment_link) = attachment_link {
+            data.with_link(attachment_link)
+        } else {
+            data
+        };
 
         message.append_attachment(
             AttachmentBuilder::new(true).with_id(&id).with_format("metadata").with_data(data),
@@ -85,7 +90,7 @@ async fn generate<R: DidRepository, V: DidVcService>(
     message: &Value,
     metadata: Option<&Value>,
     issuance_date: DateTime<Utc>,
-    attachment_link: &str,
+    attachment_link: Option<&str>,
 ) -> Result<
     DidCommMessage,
     DidCommEncryptedServiceGenerateError<R::FindIdentifierError, V::GenerateError>,
@@ -229,7 +234,7 @@ where
             message,
             metadata,
             issuance_date,
-            "",
+            None,
         )
         .await
     }
@@ -286,7 +291,7 @@ where
             message,
             metadata,
             issuance_date,
-            &self.attachment_link,
+            Some(&self.attachment_link),
         )
         .await
     }
