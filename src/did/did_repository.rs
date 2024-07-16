@@ -111,28 +111,26 @@ impl<C: SidetreeHttpClient + Send + Sync> DidRepository for DidRepositoryImpl<C>
         keyring: KeyPairing,
     ) -> Result<DidResolutionResponse, CreateIdentifierError<C::Error>> {
         // https://w3c.github.io/did-spec-registries/#assertionmethod
+        // TODO: This purpose property is strange...
+        // https://identity.foundation/sidetree/spec/#add-public-keys
+        // vec!["assertionMethod".to_string()],
         let sign = keyring
             .sign
             .get_public_key()
             .to_public_key(
                 "EcdsaSecp256k1VerificationKey2019".to_string(),
                 "signingKey".to_string(),
-                vec!["auth".to_string(), "general".to_string()], /* TODO: This purpose property
-                                                                  * is strange... https://identity.foundation/sidetree/spec/#add-public-keys
-                                                                  * vec!["assertionMethod".
-                                                                  * to_string()], */
+                vec!["auth".to_string(), "general".to_string()],
             )
             .map_err(|_| CreateIdentifierError::JwkError)?;
+        // vec!["keyAgreement".to_string()]
         let enc = keyring
             .encrypt
             .get_public_key()
             .to_public_key(
                 "X25519KeyAgreementKey2019".to_string(),
                 "encryptionKey".to_string(),
-                vec!["auth".to_string(), "general".to_string()], /* TODO: This purpose property
-                                                                  * is strange... https://identity.foundation/sidetree/spec/#add-public-keys
-                                                                  * vec!["keyAgreement".
-                                                                  * to_string()] */
+                vec!["auth".to_string(), "general".to_string()],
             )
             .map_err(|_| CreateIdentifierError::JwkError)?;
         let update: Jwk = keyring
