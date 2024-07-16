@@ -15,10 +15,10 @@ pub struct KeyPairHex {
 
 #[derive(Error, Debug)]
 pub enum KeyPairingError {
-    #[error("from hex error")]
+    #[error("from hex error: {0}")]
     FromHex(#[from] FromHexError),
-    #[error("crypt error")]
-    Crypt,
+    #[error("crypt error: {0}")]
+    Crypt(String),
 }
 
 pub trait KeyPair<S, P>: Sized {
@@ -59,11 +59,11 @@ impl KeyPair<k256::SecretKey, k256::PublicKey> for K256KeyPair {
     }
     fn from_hex_key_pair(kp: &KeyPairHex) -> Result<Self, KeyPairingError> {
         let secret_key = hex::decode(&kp.secret_key)?;
-        let secret_key =
-            k256::SecretKey::from_slice(&secret_key).map_err(|_| KeyPairingError::Crypt)?;
+        let secret_key = k256::SecretKey::from_slice(&secret_key)
+            .map_err(|e| KeyPairingError::Crypt(e.to_string()))?;
         let public_key = hex::decode(&kp.public_key)?;
-        let public_key =
-            k256::PublicKey::from_sec1_bytes(&public_key).map_err(|_| KeyPairingError::Crypt)?;
+        let public_key = k256::PublicKey::from_sec1_bytes(&public_key)
+            .map_err(|e| KeyPairingError::Crypt(e.to_string()))?;
         Ok(K256KeyPair { public_key, secret_key })
     }
 }
@@ -98,10 +98,14 @@ impl KeyPair<x25519_dalek::StaticSecret, x25519_dalek::PublicKey> for X25519KeyP
     }
     fn from_hex_key_pair(kp: &KeyPairHex) -> Result<Self, KeyPairingError> {
         let secret_key = hex::decode(&kp.secret_key)?;
-        let secret_key: [u8; 32] = secret_key.try_into().map_err(|_| KeyPairingError::Crypt)?;
+        let secret_key: [u8; 32] = secret_key.try_into().map_err(|e: Vec<u8>| {
+            KeyPairingError::Crypt(format!("array length mismatch: {}", e.len()))
+        })?;
         let secret_key = x25519_dalek::StaticSecret::from(secret_key);
         let public_key = hex::decode(&kp.public_key)?;
-        let public_key: [u8; 32] = public_key.try_into().map_err(|_| KeyPairingError::Crypt)?;
+        let public_key: [u8; 32] = public_key.try_into().map_err(|e: Vec<u8>| {
+            KeyPairingError::Crypt(format!("array length mismatch: {}", e.len()))
+        })?;
         let public_key = x25519_dalek::PublicKey::from(public_key);
         Ok(X25519KeyPair { public_key, secret_key })
     }
