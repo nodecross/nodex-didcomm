@@ -1,4 +1,3 @@
-use chrono::{DateTime, Utc};
 use serde_json::json;
 use thiserror::Error;
 
@@ -36,27 +35,24 @@ pub struct CredentialSigner {}
 
 impl CredentialSigner {
     pub fn sign(
-        object: &VerifiableCredentials,
+        mut object: VerifiableCredentials,
         suite: CredentialSignerSuite,
-        created: DateTime<Utc>,
     ) -> Result<VerifiableCredentials, CredentialSignerSignError> {
         let jws = jws::sign(&json!(object), &suite.context.get_secret_key())?;
         let did = suite.did;
         let key_id = suite.key_id;
-
-        Ok(VerifiableCredentials {
-            proof: Some(Proof {
-                r#type: "EcdsaSecp256k1Signature2019".to_string(),
-                proof_purpose: "authentication".to_string(),
-                created: created.to_rfc3339(),
-                verification_method: format!("{}#{}", did, key_id),
-                jws,
-                domain: None,
-                controller: None,
-                challenge: None,
-            }),
-            ..object.clone()
-        })
+        object.proof = Some(Proof {
+            r#type: "EcdsaSecp256k1Signature2019".to_string(),
+            proof_purpose: "authentication".to_string(),
+            // Assume that object.issuance_date is correct data
+            created: object.issuance_date.clone(),
+            verification_method: format!("{}#{}", did, key_id),
+            jws,
+            domain: None,
+            controller: None,
+            challenge: None,
+        });
+        Ok(object)
     }
 
     pub fn verify(
@@ -119,13 +115,12 @@ pub mod tests {
         };
 
         let result = CredentialSigner::sign(
-            &model,
+            model,
             CredentialSignerSuite {
                 did: "did:nodex:test:000000000000000000000000000000",
                 key_id: "signingKey",
                 context: &context,
             },
-            Utc::now(),
         )
         .unwrap();
 
@@ -166,13 +161,12 @@ pub mod tests {
         };
 
         let vc = CredentialSigner::sign(
-            &model,
+            model.clone(),
             CredentialSignerSuite {
                 did: "did:nodex:test:000000000000000000000000000000",
                 key_id: "signingKey",
                 context: &context,
             },
-            Utc::now(),
         )
         .unwrap();
 

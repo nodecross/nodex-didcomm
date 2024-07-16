@@ -1,5 +1,3 @@
-use chrono::{DateTime, Utc};
-use serde_json::Value;
 use thiserror::Error;
 
 use crate::{
@@ -10,7 +8,7 @@ use crate::{
             CredentialSigner, CredentialSignerSignError, CredentialSignerSuite,
             CredentialSignerVerifyError,
         },
-        types::{CredentialSubject, Issuer, VerifiableCredentials},
+        types::VerifiableCredentials,
     },
 };
 
@@ -20,10 +18,8 @@ pub trait DidVcService: Sync {
     type VerifyError: std::error::Error;
     fn generate(
         &self,
-        from_did: &str,
+        model: VerifiableCredentials,
         from_keyring: &keypair::KeyPairing,
-        message: &Value,
-        issuance_date: DateTime<Utc>,
     ) -> Result<VerifiableCredentials, Self::GenerateError>;
     async fn verify(
         &self,
@@ -51,40 +47,18 @@ pub enum DidVcServiceVerifyError<FindIdentifierError: std::error::Error> {
 
 #[async_trait::async_trait]
 impl<R: DidRepository> DidVcService for R {
-    type GenerateError = DidVcServiceGenerateError;
+    type GenerateError = CredentialSignerSignError;
     type VerifyError = DidVcServiceVerifyError<R::FindIdentifierError>;
     fn generate(
         &self,
-        from_did: &str,
+        model: VerifiableCredentials,
         from_keyring: &keypair::KeyPairing,
-        message: &Value,
-        issuance_date: DateTime<Utc>,
     ) -> Result<VerifiableCredentials, Self::GenerateError> {
-        let r#type = "VerifiableCredential".to_string();
-        let context = "https://www.w3.org/2018/credentials/v1".to_string();
-
-        let model = VerifiableCredentials {
-            id: None,
-            issuer: Issuer { id: from_did.to_string() },
-            r#type: vec![r#type],
-            context: vec![context],
-            issuance_date: issuance_date.to_rfc3339(),
-            credential_subject: CredentialSubject { id: None, container: message.clone() },
-            expiration_date: None,
-            proof: None,
-        };
-
-        let signed: VerifiableCredentials = CredentialSigner::sign(
-            &model,
-            CredentialSignerSuite {
-                did: from_did,
-                key_id: "signingKey",
-                context: &from_keyring.sign,
-            },
-            issuance_date,
-        )?;
-
-        Ok(signed)
+        let did = &model.issuer.id.clone();
+        CredentialSigner::sign(
+            model,
+            CredentialSignerSuite { did, key_id: "signingKey", context: &from_keyring.sign },
+        )
     }
 
     async fn verify(
@@ -107,8 +81,9 @@ impl<R: DidRepository> DidVcService for R {
 mod tests {
     use std::{collections::BTreeMap, iter::FromIterator as _};
 
+    use chrono::{DateTime, Utc};
     use rand_core::OsRng;
-    use serde_json::json;
+    use serde_json::{json, Value};
 
     use super::*;
     use crate::{
@@ -132,7 +107,8 @@ mod tests {
         let message = json!({"test": "0123456789abcdef"});
         let issuance_date = Utc::now();
 
-        let res = service.generate(&from_did, &from_keyring, &message, issuance_date).unwrap();
+        let model = VerifiableCredentials::new(from_did.clone(), message.clone(), issuance_date);
+        let res = service.generate(model, &from_keyring).unwrap();
 
         let verified = service.verify(res).await.unwrap();
 
@@ -155,8 +131,9 @@ mod tests {
             issuance_date: DateTime<Utc>,
         ) -> VerifiableCredentials {
             let service = MockDidRepository::from_single(BTreeMap::new());
-
-            service.generate(from_did, from_keyring, message, issuance_date).unwrap()
+            let model =
+                VerifiableCredentials::new(from_did.to_string(), message.clone(), issuance_date);
+            service.generate(model, from_keyring).unwrap()
         }
 
         #[actix_rt::test]

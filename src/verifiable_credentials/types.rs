@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -76,4 +77,22 @@ pub struct VerifiableCredentials {
 
     #[serde(rename = "proof", skip_serializing_if = "Option::is_none")]
     pub proof: Option<Proof>,
+}
+
+impl VerifiableCredentials {
+    pub fn new(from_did: String, message: Value, issuance_date: DateTime<Utc>) -> Self {
+        let r#type = "VerifiableCredential".to_string();
+        let context = "https://www.w3.org/2018/credentials/v1".to_string();
+
+        VerifiableCredentials {
+            id: None,
+            issuer: Issuer { id: from_did },
+            r#type: vec![r#type],
+            context: vec![context],
+            issuance_date: issuance_date.to_rfc3339(),
+            credential_subject: CredentialSubject { id: None, container: message },
+            expiration_date: None,
+            proof: None,
+        }
+    }
 }

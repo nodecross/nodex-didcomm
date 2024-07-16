@@ -235,9 +235,7 @@ pub mod mocks {
                                 id: "#encryptionKey".to_string(),
                                 controller: String::new(),
                                 r#type: "X25519KeyAgreementKey2019".to_string(),
-                                public_key_jwk: keyring
-                                    .encrypt
-                                    .get_public_key().into(),
+                                public_key_jwk: keyring.encrypt.get_public_key().into(),
                             },
                         ]
                     })
