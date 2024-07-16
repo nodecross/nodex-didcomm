@@ -4,9 +4,8 @@ use thiserror::Error;
 
 use super::types::Proof;
 use crate::{
-    common::cipher::jws,
     keyring::keypair::{K256KeyPair, KeyPair},
-    verifiable_credentials::types::VerifiableCredentials,
+    verifiable_credentials::{jws, types::VerifiableCredentials},
 };
 
 pub struct CredentialSignerSuite<'a> {
@@ -18,7 +17,7 @@ pub struct CredentialSignerSuite<'a> {
 #[derive(Debug, Error)]
 pub enum CredentialSignerSignError {
     #[error("jws error: {0:?}")]
-    JwsError(#[from] crate::common::cipher::jws::JwsEncodeError),
+    JwsError(#[from] jws::JwsEncodeError),
     #[error("json parse error: {0:?}")]
     JsonParseError(#[from] serde_json::Error),
 }
@@ -26,7 +25,7 @@ pub enum CredentialSignerSignError {
 #[derive(Debug, Error)]
 pub enum CredentialSignerVerifyError {
     #[error("jws error: {0:?}")]
-    JwsError(#[from] crate::common::cipher::jws::JwsDecodeError),
+    JwsError(#[from] jws::JwsDecodeError),
     #[error("json parse error: {0:?}")]
     JsonParseError(#[from] serde_json::Error),
     #[error("proof not found")]

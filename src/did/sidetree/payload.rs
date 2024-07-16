@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_jcs;
 use thiserror::Error;
 
-use crate::{common::runtime::multihash, keyring::jwk::Jwk};
+use crate::{did::sidetree::multihash, keyring::jwk::Jwk};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ServiceEndpoint {
