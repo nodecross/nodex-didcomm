@@ -237,9 +237,7 @@ pub mod mocks {
                                 r#type: "X25519KeyAgreementKey2019".to_string(),
                                 public_key_jwk: keyring
                                     .encrypt
-                                    .get_public_key()
-                                    .try_into()
-                                    .unwrap(),
+                                    .get_public_key().into(),
                             },
                         ]
                     })

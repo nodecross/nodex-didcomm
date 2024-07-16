@@ -159,6 +159,6 @@ pub mod tests {
     pub fn test_verify() {
         let pk = k256::PublicKey::from_sec1_bytes(&PUBLIC_KEY).unwrap();
         let json: Value = serde_json::from_str(&message()).unwrap();
-        let _ = verify(&json, &signature(), &pk).unwrap();
+        verify(&json, &signature(), &pk).unwrap();
     }
 }

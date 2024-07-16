@@ -331,8 +331,8 @@ mod tests {
         let from_did = create_random_did();
         let to_did = create_random_did();
 
-        let to_keyring = KeyPairing::create_keyring(&mut OsRng);
-        let from_keyring = KeyPairing::create_keyring(&mut OsRng);
+        let to_keyring = KeyPairing::create_keyring(OsRng);
+        let from_keyring = KeyPairing::create_keyring(OsRng);
 
         let repo = MockDidRepository::from_single(BTreeMap::from_iter([
             (from_did.clone(), from_keyring.clone()),
@@ -363,7 +363,7 @@ mod tests {
             let from_did = create_random_did();
             let to_did = create_random_did();
 
-            let from_keyring = KeyPairing::create_keyring(&mut OsRng);
+            let from_keyring = KeyPairing::create_keyring(OsRng);
 
             let repo = MockDidRepository::from_single(BTreeMap::from_iter([(
                 from_did.clone(),
@@ -390,7 +390,7 @@ mod tests {
             let from_did = create_random_did();
             let to_did = create_random_did();
 
-            let from_keyring = KeyPairing::create_keyring(&mut OsRng);
+            let from_keyring = KeyPairing::create_keyring(OsRng);
 
             let repo = NoPublicKeyDidRepository;
 
@@ -431,7 +431,7 @@ mod tests {
                 to_keyring.clone(),
             )]));
 
-            repo.generate(&from_did, &to_did, &from_keyring, &message, metadata, issuance_date)
+            repo.generate(from_did, to_did, from_keyring, message, metadata, issuance_date)
                 .await
                 .unwrap()
         }
@@ -441,8 +441,8 @@ mod tests {
             let from_did = create_random_did();
             let to_did = create_random_did();
 
-            let to_keyring = KeyPairing::create_keyring(&mut OsRng);
-            let from_keyring = KeyPairing::create_keyring(&mut OsRng);
+            let to_keyring = KeyPairing::create_keyring(OsRng);
+            let from_keyring = KeyPairing::create_keyring(OsRng);
 
             let message = json!({"test": "0123456789abcdef"});
             let issuance_date = Utc::now();
@@ -477,9 +477,9 @@ mod tests {
             let to_did = create_random_did();
             let other_did = create_random_did();
 
-            let to_keyring = KeyPairing::create_keyring(&mut OsRng);
-            let from_keyring = KeyPairing::create_keyring(&mut OsRng);
-            let other_keyring = KeyPairing::create_keyring(&mut OsRng);
+            let to_keyring = KeyPairing::create_keyring(OsRng);
+            let from_keyring = KeyPairing::create_keyring(OsRng);
+            let other_keyring = KeyPairing::create_keyring(OsRng);
 
             let message = json!({"test": "0123456789abcdef"});
             let issuance_date = Utc::now();
@@ -514,8 +514,8 @@ mod tests {
             let from_did = create_random_did();
             let to_did = create_random_did();
 
-            let to_keyring = KeyPairing::create_keyring(&mut OsRng);
-            let from_keyring = KeyPairing::create_keyring(&mut OsRng);
+            let to_keyring = KeyPairing::create_keyring(OsRng);
+            let from_keyring = KeyPairing::create_keyring(OsRng);
 
             let message = json!({"test": "0123456789abcdef"});
             let issuance_date = Utc::now();
