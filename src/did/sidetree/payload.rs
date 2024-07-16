@@ -100,7 +100,7 @@ where
         purpose: Vec<String>,
     ) -> Result<PublicKeyPayload, T::Error> {
         let jwk: Jwk = self.try_into()?;
-        Ok(PublicKeyPayload { id: key_id.into(), r#type: key_type.into(), jwk, purpose })
+        Ok(PublicKeyPayload { id: key_id, r#type: key_type, jwk, purpose })
     }
 }
 

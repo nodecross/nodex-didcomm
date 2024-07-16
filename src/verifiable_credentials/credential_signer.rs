@@ -17,17 +17,17 @@ pub struct CredentialSignerSuite<'a> {
 #[derive(Debug, Error)]
 pub enum CredentialSignerSignError {
     #[error("jws error: {0:?}")]
-    JwsError(#[from] jws::JwsEncodeError),
+    Jws(#[from] jws::JwsEncodeError),
     #[error("json parse error: {0:?}")]
-    JsonParseError(#[from] serde_json::Error),
+    Json(#[from] serde_json::Error),
 }
 
 #[derive(Debug, Error)]
 pub enum CredentialSignerVerifyError {
     #[error("jws error: {0:?}")]
-    JwsError(#[from] jws::JwsDecodeError),
+    Jws(#[from] jws::JwsDecodeError),
     #[error("json parse error: {0:?}")]
-    JsonParseError(#[from] serde_json::Error),
+    Json(#[from] serde_json::Error),
     #[error("proof not found")]
     ProofNotFound,
 }
@@ -66,7 +66,7 @@ impl CredentialSigner {
         let proof = object.proof.take().ok_or(CredentialSignerVerifyError::ProofNotFound)?;
         let jws = proof.jws;
         let payload = serde_json::to_value(&object)?;
-        let _ = jws::verify(&payload, &jws, public_key)?;
+        jws::verify(&payload, &jws, public_key)?;
         Ok(object)
     }
 }

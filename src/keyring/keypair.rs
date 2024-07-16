@@ -16,9 +16,9 @@ pub struct KeyPairHex {
 #[derive(Error, Debug)]
 pub enum KeyPairingError {
     #[error("from hex error")]
-    FromHexError(#[from] FromHexError),
+    FromHex(#[from] FromHexError),
     #[error("crypt error")]
-    CryptError,
+    Crypt,
 }
 
 pub trait KeyPair<S, P>: Sized {
@@ -48,11 +48,11 @@ impl KeyPair<k256::SecretKey, k256::PublicKey> for K256KeyPair {
         self.secret_key.clone()
     }
     fn get_public_key(&self) -> k256::PublicKey {
-        self.public_key.clone()
+        self.public_key
     }
     fn to_hex_key_pair(&self) -> KeyPairHex {
         let sk = self.secret_key.to_bytes();
-        let secret_key = hex::encode(&sk);
+        let secret_key = hex::encode(sk);
         let pk = self.public_key.to_encoded_point(false);
         let public_key = hex::encode(pk.as_bytes());
         KeyPairHex { secret_key, public_key }
@@ -60,10 +60,10 @@ impl KeyPair<k256::SecretKey, k256::PublicKey> for K256KeyPair {
     fn from_hex_key_pair(kp: &KeyPairHex) -> Result<Self, KeyPairingError> {
         let secret_key = hex::decode(&kp.secret_key)?;
         let secret_key =
-            k256::SecretKey::from_slice(&secret_key).map_err(|_| KeyPairingError::CryptError)?;
+            k256::SecretKey::from_slice(&secret_key).map_err(|_| KeyPairingError::Crypt)?;
         let public_key = hex::decode(&kp.public_key)?;
-        let public_key = k256::PublicKey::from_sec1_bytes(&public_key)
-            .map_err(|_| KeyPairingError::CryptError)?;
+        let public_key =
+            k256::PublicKey::from_sec1_bytes(&public_key).map_err(|_| KeyPairingError::Crypt)?;
         Ok(K256KeyPair { public_key, secret_key })
     }
 }
@@ -87,7 +87,7 @@ impl KeyPair<x25519_dalek::StaticSecret, x25519_dalek::PublicKey> for X25519KeyP
         self.secret_key.clone()
     }
     fn get_public_key(&self) -> x25519_dalek::PublicKey {
-        self.public_key.clone()
+        self.public_key
     }
     fn to_hex_key_pair(&self) -> KeyPairHex {
         let sk = self.secret_key.as_bytes();
@@ -98,12 +98,10 @@ impl KeyPair<x25519_dalek::StaticSecret, x25519_dalek::PublicKey> for X25519KeyP
     }
     fn from_hex_key_pair(kp: &KeyPairHex) -> Result<Self, KeyPairingError> {
         let secret_key = hex::decode(&kp.secret_key)?;
-        let secret_key: [u8; 32] =
-            secret_key.try_into().map_err(|_| KeyPairingError::CryptError)?;
+        let secret_key: [u8; 32] = secret_key.try_into().map_err(|_| KeyPairingError::Crypt)?;
         let secret_key = x25519_dalek::StaticSecret::from(secret_key);
         let public_key = hex::decode(&kp.public_key)?;
-        let public_key: [u8; 32] =
-            public_key.try_into().map_err(|_| KeyPairingError::CryptError)?;
+        let public_key: [u8; 32] = public_key.try_into().map_err(|_| KeyPairingError::Crypt)?;
         let public_key = x25519_dalek::PublicKey::from(public_key);
         Ok(X25519KeyPair { public_key, secret_key })
     }

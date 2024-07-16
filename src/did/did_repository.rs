@@ -58,14 +58,14 @@ fn get_key(key_type: &str, did_document: &DidDocument) -> Result<Jwk, GetPublicK
 }
 
 pub fn get_sign_key(did_document: &DidDocument) -> Result<k256::PublicKey, GetPublicKeyError> {
-    let public_key = get_key("#signingKey", &did_document)?;
+    let public_key = get_key("#signingKey", did_document)?;
     Ok(public_key.try_into()?)
 }
 
 pub fn get_encrypt_key(
     did_document: &DidDocument,
 ) -> Result<x25519_dalek::PublicKey, GetPublicKeyError> {
-    let public_key = get_key("#encryptionKey", &did_document)?;
+    let public_key = get_key("#encryptionKey", did_document)?;
     Ok(public_key.try_into()?)
 }
 

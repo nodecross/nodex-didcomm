@@ -78,8 +78,8 @@ impl TryFrom<k256::PublicKey> for Jwk {
         let crv = "secp256k1".to_string();
         match value.coordinates() {
             elliptic_curve::sec1::Coordinates::Uncompressed { x, y } => {
-                let x = BASE64URL_NOPAD.encode(&x);
-                let y = Some(BASE64URL_NOPAD.encode(&y));
+                let x = BASE64URL_NOPAD.encode(x);
+                let y = Some(BASE64URL_NOPAD.encode(y));
                 Ok(Jwk { kty, crv, x, y })
             }
             _ => Err(()),
@@ -94,7 +94,7 @@ impl TryFrom<Jwk> for x25519_dalek::PublicKey {
             return Err(JwkToX25519Error::DifferentCrv);
         }
         let pk = BASE64URL_NOPAD
-            .decode(&value.x.as_bytes())
+            .decode(value.x.as_bytes())
             .map_err(|_| JwkToX25519Error::DecodeError)?;
         let pk: [u8; 32] = pk.try_into().map_err(|_| JwkToX25519Error::DecodeError)?;
         Ok(pk.into())

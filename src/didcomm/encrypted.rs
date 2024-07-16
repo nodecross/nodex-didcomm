@@ -76,11 +76,12 @@ fn didcomm_generate<R: DidRepository, V: DidVcService>(
 
     let seal_message = message
         .as_jwe(&CryptoAlgorithm::XC20P, public_key.clone())
-        .seal(&from_keyring.encrypt.get_secret_key().as_bytes().to_vec(), Some(vec![public_key]))?;
+        .seal(from_keyring.encrypt.get_secret_key().as_bytes(), Some(vec![public_key]))?;
 
     Ok(serde_json::from_str::<DidCommMessage>(&seal_message)?)
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn generate<R: DidRepository, V: DidVcService>(
     did_repository: &R,
     vc_service: &V,
@@ -97,7 +98,7 @@ async fn generate<R: DidRepository, V: DidVcService>(
 > {
     let body = vc_service
         .generate(from_did, from_keyring, message, issuance_date)
-        .map_err(DidCommEncryptedServiceGenerateError::VCServiceError)?;
+        .map_err(DidCommEncryptedServiceGenerateError::VcService)?;
     let to_doc = did_repository
         .find_identifier(to_did)
         .await
@@ -105,7 +106,7 @@ async fn generate<R: DidRepository, V: DidVcService>(
         .ok_or(DidCommEncryptedServiceGenerateError::DidDocNotFound(to_did.to_string()))?
         .did_document;
 
-    Ok(didcomm_generate::<R, V>(from_did, &to_doc, from_keyring, &body, metadata, attachment_link)?)
+    didcomm_generate::<R, V>(from_did, &to_doc, from_keyring, &body, metadata, attachment_link)
 }
 
 fn didcomm_verify<R: DidRepository>(
@@ -119,7 +120,7 @@ fn didcomm_verify<R: DidRepository>(
 
     let message = Message::receive(
         &serde_json::to_string(&message)?,
-        Some(&my_keyring.encrypt.get_secret_key().as_bytes().to_vec()),
+        Some(my_keyring.encrypt.get_secret_key().as_bytes().as_ref()),
         public_key,
         None,
     )?;
@@ -179,13 +180,13 @@ where
     #[error("did public key not found. did: {0}")]
     DidPublicKeyNotFound(#[from] GetPublicKeyError),
     #[error("something went wrong with vc service")]
-    VCServiceError(DidVcServiceGenerateError),
+    VcService(DidVcServiceGenerateError),
     #[error("failed to create identifier")]
     SidetreeFindRequestFailed(FindIdentifierError),
     #[error("failed to encrypt message with error: {0}")]
     EncryptFailed(#[from] didcomm_rs::Error),
     #[error("failed serialize/deserialize : {0}")]
-    JsonError(#[from] serde_json::Error),
+    Json(#[from] serde_json::Error),
 }
 
 #[derive(Debug, Error)]
@@ -193,7 +194,7 @@ pub enum DidCommEncryptedServiceVerifyError<FindIdentifierError: std::error::Err
     #[error("failed to get did document: {0}")]
     DidDocNotFound(String),
     #[error("something went wrong with vc service")]
-    VCServiceError(#[from] CredentialSignerVerifyError),
+    VcService(#[from] CredentialSignerVerifyError),
     #[error("failed to find identifier")]
     SidetreeFindRequestFailed(FindIdentifierError),
     #[error("did public key not found. did: {0}")]
@@ -203,9 +204,9 @@ pub enum DidCommEncryptedServiceVerifyError<FindIdentifierError: std::error::Err
     #[error("failed to get body : {0:?}")]
     MetadataBodyNotFound(Option<didcomm_rs::Error>),
     #[error("failed serialize/deserialize : {0}")]
-    JsonError(#[from] serde_json::Error),
+    Json(#[from] serde_json::Error),
     #[error("failed to find sender did : {0}")]
-    FindSenderError(#[from] FindSenderError),
+    FindSender(#[from] FindSenderError),
 }
 
 #[async_trait::async_trait]

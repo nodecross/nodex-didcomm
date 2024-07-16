@@ -37,13 +37,13 @@ pub struct Epk {
 #[derive(Debug, Error)]
 pub enum FindSenderError {
     #[error("failed serialize/deserialize: {0}")]
-    JsonError(#[from] serde_json::Error),
+    Json(#[from] serde_json::Error),
     #[error("failed to base64 decode protected: {0}")]
-    FromUtf8Error(#[from] std::string::FromUtf8Error),
+    FromUtf8(#[from] std::string::FromUtf8Error),
     #[error("failed to base64 decode protected: {0}")]
-    DecodeError(#[from] data_encoding::DecodeError),
+    Decode(#[from] data_encoding::DecodeError),
     #[error("skid error")]
-    SkidError,
+    Skid,
 }
 
 impl DidCommMessage {
@@ -60,9 +60,9 @@ impl DidCommMessage {
 
         let from_did = decoded
             .get("skid")
-            .ok_or(FindSenderError::SkidError)?
+            .ok_or(FindSenderError::Skid)?
             .as_str()
-            .ok_or(FindSenderError::SkidError)?
+            .ok_or(FindSenderError::Skid)?
             .to_string();
 
         Ok(from_did)
