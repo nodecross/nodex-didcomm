@@ -121,8 +121,7 @@ pub struct KeyPairing {
 pub struct KeyPairingHex {
     pub sign: KeyPairHex,
     pub update: KeyPairHex,
-    // MEMO: Matching schema in NodeX config.
-    pub recover: KeyPairHex,
+    pub recovery: KeyPairHex,
     pub encrypt: KeyPairHex,
 }
 
@@ -141,7 +140,7 @@ impl From<&KeyPairing> for KeyPairingHex {
         KeyPairingHex {
             sign: keypair.sign.to_hex_key_pair(),
             update: keypair.update.to_hex_key_pair(),
-            recover: keypair.recovery.to_hex_key_pair(),
+            recovery: keypair.recovery.to_hex_key_pair(),
             encrypt: keypair.encrypt.to_hex_key_pair(),
         }
     }
@@ -153,7 +152,7 @@ impl TryFrom<&KeyPairingHex> for KeyPairing {
     fn try_from(hex: &KeyPairingHex) -> Result<Self, Self::Error> {
         let sign = K256KeyPair::from_hex_key_pair(&hex.sign)?;
         let update = K256KeyPair::from_hex_key_pair(&hex.update)?;
-        let recovery = K256KeyPair::from_hex_key_pair(&hex.recover)?;
+        let recovery = K256KeyPair::from_hex_key_pair(&hex.recovery)?;
         let encrypt = X25519KeyPair::from_hex_key_pair(&hex.encrypt)?;
 
         Ok(KeyPairing { sign, update, recovery, encrypt })
