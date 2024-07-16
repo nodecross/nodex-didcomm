@@ -28,12 +28,6 @@ pub trait DidVcService: Sync {
 }
 
 #[derive(Debug, Error)]
-pub enum DidVcServiceGenerateError {
-    #[error("credential signer error")]
-    SignFailed(#[from] CredentialSignerSignError),
-}
-
-#[derive(Debug, Error)]
 pub enum DidVcServiceVerifyError<FindIdentifierError: std::error::Error> {
     #[error("did public key not found. did: {0}")]
     PublicKeyNotFound(#[from] GetPublicKeyError),

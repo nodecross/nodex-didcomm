@@ -164,17 +164,17 @@ async fn verify<R: DidRepository>(
 }
 
 #[derive(Debug, Error)]
-pub enum DidCommEncryptedServiceGenerateError<FindIdentifierError, DidVcServiceGenerateError>
+pub enum DidCommEncryptedServiceGenerateError<FindIdentifierError, CredentialSignerSignError>
 where
     FindIdentifierError: std::error::Error,
-    DidVcServiceGenerateError: std::error::Error,
+    CredentialSignerSignError: std::error::Error,
 {
     #[error("failed to get did document: {0}")]
     DidDocNotFound(String),
     #[error("did public key not found. did: {0}")]
     DidPublicKeyNotFound(#[from] GetPublicKeyError),
     #[error("something went wrong with vc service")]
-    VcService(DidVcServiceGenerateError),
+    VcService(CredentialSignerSignError),
     #[error("failed to create identifier")]
     SidetreeFindRequestFailed(FindIdentifierError),
     #[error("failed to encrypt message with error: {0}")]
