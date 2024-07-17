@@ -16,6 +16,7 @@ use crate::{
         types::{VerifiableCredentials, VerifiedContainer},
     },
 };
+pub use didcomm_rs;
 
 #[async_trait::async_trait]
 pub trait DidCommEncryptedService: Sync {
