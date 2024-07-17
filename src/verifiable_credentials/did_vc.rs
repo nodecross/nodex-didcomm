@@ -34,7 +34,7 @@ pub enum DidVcServiceVerifyError<FindIdentifierError: std::error::Error> {
     #[error("failed to get did document: {0}")]
     DidDocNotFound(String),
     #[error("failed to find indentifier: {0}")]
-    FindIdentifierError(FindIdentifierError),
+    FindIdentifier(FindIdentifierError),
     #[error("credential signer error")]
     VerifyFailed(#[from] CredentialSignerVerifyError),
 }
@@ -62,7 +62,7 @@ impl<R: DidRepository> DidVcService for R {
         let did_document = self
             .find_identifier(&model.issuer.id)
             .await
-            .map_err(Self::VerifyError::FindIdentifierError)?;
+            .map_err(Self::VerifyError::FindIdentifier)?;
         let did_document = did_document
             .ok_or(DidVcServiceVerifyError::DidDocNotFound(model.issuer.id.clone()))?
             .did_document;

@@ -1,4 +1,5 @@
 use cuid;
+pub use didcomm_rs;
 use didcomm_rs::{crypto::CryptoAlgorithm, AttachmentBuilder, AttachmentDataBuilder, Message};
 use serde_json::Value;
 use thiserror::Error;
@@ -16,7 +17,6 @@ use crate::{
         types::{VerifiableCredentials, VerifiedContainer},
     },
 };
-pub use didcomm_rs;
 
 #[async_trait::async_trait]
 pub trait DidCommEncryptedService: Sync {
