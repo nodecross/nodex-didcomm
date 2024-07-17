@@ -1,3 +1,3 @@
 pub mod client;
-mod multihash;
+pub mod multihash;
 pub mod payload;
