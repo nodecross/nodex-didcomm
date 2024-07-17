@@ -7,8 +7,9 @@ use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 pub use x25519_dalek;
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Zeroize, ZeroizeOnDrop)]
 pub struct KeyPairHex {
     // MEMO: Matching schema in NodeX config.
     public_key: String,
