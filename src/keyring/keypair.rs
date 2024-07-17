@@ -2,9 +2,11 @@ use std::convert::{TryFrom, TryInto};
 
 use elliptic_curve::sec1::ToEncodedPoint;
 use hex::FromHexError;
+pub use k256;
 use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+pub use x25519_dalek;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct KeyPairHex {
