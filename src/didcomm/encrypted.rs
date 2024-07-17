@@ -110,7 +110,6 @@ fn didcomm_verify<R: DidRepository>(
     message: &DidCommMessage,
 ) -> Result<VerifiedContainer, DidCommEncryptedServiceVerifyError<R::FindIdentifierError>> {
     let public_key = get_encrypt_key(from_doc)?.as_bytes().to_vec();
-
     let public_key = Some(public_key);
 
     let message = Message::receive(
@@ -174,13 +173,13 @@ where
     DidDocNotFound(String),
     #[error("did public key not found. did: {0}")]
     DidPublicKeyNotFound(#[from] GetPublicKeyError),
-    #[error("something went wrong with vc service")]
+    #[error("something went wrong with vc service: {0}")]
     VcService(CredentialSignerSignError),
-    #[error("failed to create identifier")]
+    #[error("failed to create identifier: {0}")]
     SidetreeFindRequestFailed(FindIdentifierError),
     #[error("failed to encrypt message with error: {0}")]
     EncryptFailed(#[from] didcomm_rs::Error),
-    #[error("failed serialize/deserialize : {0}")]
+    #[error("failed serialize/deserialize: {0}")]
     Json(#[from] serde_json::Error),
 }
 
@@ -188,19 +187,19 @@ where
 pub enum DidCommEncryptedServiceVerifyError<FindIdentifierError: std::error::Error> {
     #[error("failed to get did document: {0}")]
     DidDocNotFound(String),
-    #[error("something went wrong with vc service")]
+    #[error("something went wrong with vc service: {0}")]
     VcService(#[from] CredentialSignerVerifyError),
-    #[error("failed to find identifier")]
+    #[error("failed to find identifier: {0}")]
     SidetreeFindRequestFailed(FindIdentifierError),
     #[error("did public key not found. did: {0}")]
     DidPublicKeyNotFound(#[from] GetPublicKeyError),
-    #[error("failed to decrypt message : {0}")]
+    #[error("failed to decrypt message: {0}")]
     DecryptFailed(#[from] didcomm_rs::Error),
-    #[error("failed to get body : {0:?}")]
+    #[error("failed to get body: {0:?}")]
     MetadataBodyNotFound(Option<didcomm_rs::Error>),
-    #[error("failed serialize/deserialize : {0}")]
+    #[error("failed serialize/deserialize: {0}")]
     Json(#[from] serde_json::Error),
-    #[error("failed to find sender did : {0}")]
+    #[error("failed to find sender did: {0}")]
     FindSender(#[from] FindSenderError),
 }
 
