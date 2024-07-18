@@ -38,15 +38,6 @@ pub struct DidPublicKey {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct Authentication {
-    #[serde(rename = "type")]
-    r#type: String,
-
-    #[serde(rename = "publicKey")]
-    public_key: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
 pub struct DidDocument {
     // TODO: impl parser for mixed type
     // #[serde(rename = "@context")]
