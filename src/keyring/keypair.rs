@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 pub use x25519_dalek;
 use zeroize::{Zeroize, ZeroizeOnDrop};
+pub use rand_core;
 
 #[derive(Clone, Serialize, Deserialize, Zeroize, ZeroizeOnDrop)]
 pub struct KeyPairHex {

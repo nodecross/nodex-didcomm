@@ -2,7 +2,7 @@ use core::convert::TryInto;
 
 use data_encoding::BASE64URL_NOPAD;
 use serde::{Deserialize, Serialize};
-use serde_jcs;
+pub use serde_jcs;
 use thiserror::Error;
 
 use crate::{did::sidetree::multihash, keyring::jwk::Jwk};
