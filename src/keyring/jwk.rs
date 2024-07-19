@@ -1,6 +1,7 @@
 use std::convert::{From, Into, TryFrom, TryInto};
 
-use data_encoding::BASE64URL_NOPAD;
+pub use data_encoding;
+use data_encoding::{DecodeError, DecodePartial, BASE64URL_NOPAD};
 use k256::elliptic_curve::sec1::ToEncodedPoint;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -25,30 +26,32 @@ pub enum JwkToK256Error {
     #[error("missing y")]
     MissingY,
     #[error("decode error")]
-    DecodeError,
+    Decode(DecodePartial),
     #[error("different crv")]
     DifferentCrv,
-    #[error("crypt error")]
-    CryptError,
+    #[error("crypt error: {0}")]
+    Crypt(#[from] k256::elliptic_curve::Error),
 }
 
 #[derive(Error, Debug)]
 pub enum JwkToX25519Error {
     #[error("decode error")]
-    DecodeError,
+    Decode(Option<DecodeError>),
     #[error("different crv")]
     DifferentCrv,
-    #[error("crypt error")]
-    CryptError,
+}
+
+#[derive(Error, Debug)]
+pub enum K256ToJwkError {
+    #[error("points are invalid")]
+    PointsInvalid,
 }
 
 fn decode_base64url(
     s: &str,
 ) -> Result<k256::elliptic_curve::FieldBytes<k256::Secp256k1>, JwkToK256Error> {
     let mut result = k256::elliptic_curve::FieldBytes::<k256::Secp256k1>::default();
-    BASE64URL_NOPAD
-        .decode_mut(s.as_bytes(), &mut result)
-        .map_err(|_| JwkToK256Error::DecodeError)?;
+    BASE64URL_NOPAD.decode_mut(s.as_bytes(), &mut result).map_err(JwkToK256Error::Decode)?;
     Ok(result)
 }
 
@@ -62,8 +65,8 @@ impl TryFrom<Jwk> for k256::PublicKey {
             let x = decode_base64url(&value.x)?;
             let y = decode_base64url(&y)?;
             let pk = k256::EncodedPoint::from_affine_coordinates(&x, &y, false);
-            let pk = k256::PublicKey::from_sec1_bytes(pk.as_bytes());
-            pk.map_err(|_| JwkToK256Error::CryptError)
+            let pk = k256::PublicKey::from_sec1_bytes(pk.as_bytes())?;
+            Ok(pk)
         } else {
             Err(JwkToK256Error::MissingY)
         }
@@ -71,7 +74,7 @@ impl TryFrom<Jwk> for k256::PublicKey {
 }
 
 impl TryFrom<k256::PublicKey> for Jwk {
-    type Error = ();
+    type Error = K256ToJwkError;
     fn try_from(value: k256::PublicKey) -> Result<Self, Self::Error> {
         let value = value.to_encoded_point(false);
         let kty = "EC".to_string();
@@ -82,7 +85,7 @@ impl TryFrom<k256::PublicKey> for Jwk {
                 let y = Some(BASE64URL_NOPAD.encode(y));
                 Ok(Jwk { kty, crv, x, y })
             }
-            _ => Err(()),
+            _ => Err(K256ToJwkError::PointsInvalid),
         }
     }
 }
@@ -95,8 +98,8 @@ impl TryFrom<Jwk> for x25519_dalek::PublicKey {
         }
         let pk = BASE64URL_NOPAD
             .decode(value.x.as_bytes())
-            .map_err(|_| JwkToX25519Error::DecodeError)?;
-        let pk: [u8; 32] = pk.try_into().map_err(|_| JwkToX25519Error::DecodeError)?;
+            .map_err(|e| JwkToX25519Error::Decode(Some(e)))?;
+        let pk: [u8; 32] = pk.try_into().map_err(|_| JwkToX25519Error::Decode(None))?;
         Ok(pk.into())
     }
 }
