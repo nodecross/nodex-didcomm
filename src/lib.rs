@@ -2,6 +2,8 @@ pub mod did;
 pub mod didcomm;
 pub mod keyring;
 pub mod verifiable_credentials;
+pub use chrono;
+pub use cuid;
 pub use hex;
 pub use http;
 pub use k256;
