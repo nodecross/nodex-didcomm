@@ -70,7 +70,7 @@ impl CredentialSigner {
 #[cfg(test)]
 pub mod tests {
 
-    use chrono::{DateTime, Local};
+    use chrono::{DateTime, Utc};
 
     use super::*;
     use crate::verifiable_credentials::types::{CredentialSubject, Issuer};
@@ -155,7 +155,7 @@ pub mod tests {
             r#type: vec!["type".to_string()],
             issuer: Issuer { id: "issuer".to_string() },
             context: vec!["context".to_string()],
-            issuance_date: Local::now().to_utc(),
+            issuance_date: Utc::now(),
             credential_subject: CredentialSubject {
                 id: None,
                 container: json!(r#"{"k":"0123456789abcdef"}"#),
