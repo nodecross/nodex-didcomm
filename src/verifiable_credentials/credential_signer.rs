@@ -45,7 +45,7 @@ impl CredentialSigner {
             r#type: "EcdsaSecp256k1Signature2019".to_string(),
             proof_purpose: "authentication".to_string(),
             // Assume that object.issuance_date is correct data
-            created: object.issuance_date.clone(),
+            created: object.issuance_date,
             verification_method: format!("{}#{}", did, key_id),
             jws,
             domain: None,
@@ -69,6 +69,8 @@ impl CredentialSigner {
 
 #[cfg(test)]
 pub mod tests {
+
+    use chrono::{DateTime, Local};
 
     use super::*;
     use crate::verifiable_credentials::types::{CredentialSubject, Issuer};
@@ -105,7 +107,9 @@ pub mod tests {
             r#type: vec!["type".to_string()],
             issuer: Issuer { id: "issuer".to_string() },
             context: vec!["context".to_string()],
-            issuance_date: "issuance_date".to_string(),
+            issuance_date: DateTime::parse_from_rfc3339("2024-07-19T06:06:51.361316372Z")
+                .unwrap()
+                .to_utc(),
             credential_subject: CredentialSubject {
                 id: None,
                 container: json!(r#"{"k":"0123456789abcdef"}"#),
@@ -128,7 +132,7 @@ pub mod tests {
             Some(proof) => {
                 assert_eq!(
                     proof.jws,
-                    "eyJhbGciOiJFUzI1NksiLCJiNjQiOmZhbHNlLCJjcml0IjpbImI2NCJdfQ..Qc-NyzQu2v735_qPR72j1oqUDK1Ne4XQ7Lc66_x9tlMSeI9xmrgguEA8UmQyTM0cd13xkvpK4g-NEWJBp8_d_w"
+                    "eyJhbGciOiJFUzI1NksiLCJiNjQiOmZhbHNlLCJjcml0IjpbImI2NCJdfQ..LK8OcOuMgWU4Y5Zpz9jeQ8b5UsgDmjKJTBpuxFepGlp-hGVHVgyZz8QkZseqQRdUXn6JouVYo1jFsQCq_7p7ig"
                 );
                 assert_eq!(proof.proof_purpose, "authentication");
                 assert_eq!(proof.r#type, "EcdsaSecp256k1Signature2019");
@@ -151,7 +155,7 @@ pub mod tests {
             r#type: vec!["type".to_string()],
             issuer: Issuer { id: "issuer".to_string() },
             context: vec!["context".to_string()],
-            issuance_date: "issuance_date".to_string(),
+            issuance_date: Local::now().to_utc(),
             credential_subject: CredentialSubject {
                 id: None,
                 container: json!(r#"{"k":"0123456789abcdef"}"#),

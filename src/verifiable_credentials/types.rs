@@ -33,7 +33,7 @@ pub struct Proof {
     pub proof_purpose: String,
 
     #[serde(rename = "created")]
-    pub created: String,
+    pub created: DateTime<Utc>,
 
     #[serde(rename = "verificationMethod")]
     pub verification_method: String,
@@ -61,7 +61,7 @@ pub struct VerifiableCredentials {
     pub issuer: Issuer,
 
     #[serde(rename = "issuanceDate")]
-    pub issuance_date: String,
+    pub issuance_date: DateTime<Utc>,
 
     #[serde(rename = "expirationDate", skip_serializing_if = "Option::is_none")]
     pub expiration_date: Option<String>,
@@ -89,7 +89,7 @@ impl VerifiableCredentials {
             issuer: Issuer { id: from_did },
             r#type: vec![r#type],
             context: vec![context],
-            issuance_date: issuance_date.to_rfc3339(),
+            issuance_date,
             credential_subject: CredentialSubject { id: None, container: message },
             expiration_date: None,
             proof: None,
