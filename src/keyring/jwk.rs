@@ -1,7 +1,7 @@
 use std::convert::{From, Into, TryFrom, TryInto};
 
 use data_encoding::BASE64URL_NOPAD;
-use elliptic_curve::sec1::ToEncodedPoint;
+use k256::elliptic_curve::sec1::ToEncodedPoint;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -44,8 +44,8 @@ pub enum JwkToX25519Error {
 
 fn decode_base64url(
     s: &str,
-) -> Result<elliptic_curve::FieldBytes<k256::Secp256k1>, JwkToK256Error> {
-    let mut result = elliptic_curve::FieldBytes::<k256::Secp256k1>::default();
+) -> Result<k256::elliptic_curve::FieldBytes<k256::Secp256k1>, JwkToK256Error> {
+    let mut result = k256::elliptic_curve::FieldBytes::<k256::Secp256k1>::default();
     BASE64URL_NOPAD
         .decode_mut(s.as_bytes(), &mut result)
         .map_err(|_| JwkToK256Error::DecodeError)?;
@@ -77,7 +77,7 @@ impl TryFrom<k256::PublicKey> for Jwk {
         let kty = "EC".to_string();
         let crv = "secp256k1".to_string();
         match value.coordinates() {
-            elliptic_curve::sec1::Coordinates::Uncompressed { x, y } => {
+            k256::elliptic_curve::sec1::Coordinates::Uncompressed { x, y } => {
                 let x = BASE64URL_NOPAD.encode(x);
                 let y = Some(BASE64URL_NOPAD.encode(y));
                 Ok(Jwk { kty, crv, x, y })

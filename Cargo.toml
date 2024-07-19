@@ -9,31 +9,28 @@ version = "0.1.2"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-arrayref = { version = "0.3.7" }
 async-trait = "0.1.79"
 chrono = { version = "0.4", features = ["serde"] }
-cuid = { version = "1.3.2" }
-data-encoding = { version = "2.5.0" }
-didcomm-rs = { git = "https://github.com/nodecross/didcomm-rs.git", tag = "v0.8.1", default-features = false, features = ["raw-crypto"] }
-hex = { version = "0.4.3" }
-hmac = { version = "0.12.1" }
-http = { version = "1.1.0" }
+data-encoding = "2.5.0"
+cuid = "1.3.2"
+hex = "0.4.3"
+generic-array = "0.14.7"
+http = "1.1.0"
+serde = { version = "1.0.197", features = ["derive"] }
+serde_json = "1.0.115"
+serde_jcs = "0.1.0"
+thiserror = "1.0.58"
+sha2 = "0.10.8"
+rand_core = "0.6.4"
+zeroize = "1.8.1"
 k256 = { version = "0.13.3", features = [
     "ecdh",
     "ecdsa",
     "serde",
     "sha256",
 ] }
-elliptic-curve = { version = "0.13.8", features = ["sec1"] }
-log = { version = "0.4.21" }
-serde = { version = "1.0.204", features = ["derive"] }
-serde_jcs = { version = "0.1.0" }
-serde_json = { version = "1.0.116" }
-sha2 = { version = "0.10.8" }
-thiserror = "1.0.59"
 x25519-dalek = { version = "2.0.1", features = ["static_secrets"] }
-rand_core = "0.6.4"
-zeroize = "1.8.1"
+didcomm-rs = { git = "https://github.com/nodecross/didcomm-rs.git", tag = "v0.8.1", default-features = false, features = ["raw-crypto"] }
 
 [dev-dependencies]
 actix-rt = { version = "2.9.0" }

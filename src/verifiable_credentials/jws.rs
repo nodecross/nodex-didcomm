@@ -1,5 +1,5 @@
 use data_encoding::BASE64URL_NOPAD;
-use hmac::digest::generic_array::GenericArray;
+use generic_array::GenericArray;
 use k256::ecdsa::{
     signature::{Signer, Verifier},
     Signature, SigningKey, VerifyingKey,

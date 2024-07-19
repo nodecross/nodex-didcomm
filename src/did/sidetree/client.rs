@@ -1,4 +1,4 @@
-pub use http::StatusCode;
+use http::StatusCode;
 
 #[derive(Clone, Debug)]
 pub struct SidetreeHttpClientResponse {
