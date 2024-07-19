@@ -1,6 +1,7 @@
 use cuid;
 pub use didcomm_rs;
 use didcomm_rs::{crypto::CryptoAlgorithm, AttachmentBuilder, AttachmentDataBuilder, Message};
+pub use serde_json;
 use serde_json::Value;
 use thiserror::Error;
 
