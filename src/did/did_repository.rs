@@ -83,20 +83,12 @@ pub trait DidRepository: Sync {
     ) -> Result<Option<DidResolutionResponse>, Self::FindIdentifierError>;
 }
 
-pub struct DidRepositoryImpl<C: SidetreeHttpClient + Send + Sync> {
+#[derive(Clone)]
+pub struct DidRepositoryImpl<C: SidetreeHttpClient> {
     client: C,
 }
 
-impl<C> Clone for DidRepositoryImpl<C>
-where
-    C: SidetreeHttpClient + Send + Sync + Clone,
-{
-    fn clone(&self) -> Self {
-        Self { client: self.client.clone() }
-    }
-}
-
-impl<C: SidetreeHttpClient + Send + Sync> DidRepositoryImpl<C> {
+impl<C: SidetreeHttpClient> DidRepositoryImpl<C> {
     pub fn new(client: C) -> Self {
         Self { client }
     }
