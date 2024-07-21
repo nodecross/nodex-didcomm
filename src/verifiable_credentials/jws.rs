@@ -1,10 +1,9 @@
+use std::convert::TryInto;
+
 use data_encoding::BASE64URL_NOPAD;
-use k256::{
-    ecdsa::{
-        signature::{Signer, Verifier},
-        Signature, SigningKey, VerifyingKey,
-    },
-    sha2::digest::generic_array::GenericArray,
+use k256::ecdsa::{
+    signature::{Signer, Verifier},
+    Signature, SigningKey, VerifyingKey,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -114,8 +113,8 @@ pub fn verify(
     if signature.len() != 64 {
         return Err(JwsDecodeError::InvalidSignatureLength(signature.len()));
     }
-    let r = GenericArray::from_slice(&signature[0..32]);
-    let s = GenericArray::from_slice(&signature[32..]);
+    let r: &[u8; 32] = &signature[0..32].try_into().unwrap();
+    let s: &[u8; 32] = &signature[32..].try_into().unwrap();
     let wrapped_signature = Signature::from_scalars(*r, *s)?;
 
     let verify_key = VerifyingKey::from(public_key);
