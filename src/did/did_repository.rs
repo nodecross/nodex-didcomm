@@ -16,7 +16,7 @@ use crate::keyring::{
 #[derive(Debug, thiserror::Error)]
 pub enum CreateIdentifierError<StudioClientError: std::error::Error> {
     #[error("Failed to convert to JWK")]
-    JwkError,
+    Jwk,
     #[error("Failed to build operation payload: {0}")]
     PayloadBuildFailed(#[from] crate::did::sidetree::payload::DidCreatePayloadError),
     #[error("Failed to parse body: {0}")]
@@ -114,7 +114,7 @@ impl<C: SidetreeHttpClient + Send + Sync> DidRepository for DidRepositoryImpl<C>
                 "signingKey".to_string(),
                 vec!["auth".to_string(), "general".to_string()],
             )
-            .map_err(|_| CreateIdentifierError::JwkError)?;
+            .map_err(|_| CreateIdentifierError::Jwk)?;
         // vec!["keyAgreement".to_string()]
         let enc = keyring
             .encrypt
@@ -124,17 +124,11 @@ impl<C: SidetreeHttpClient + Send + Sync> DidRepository for DidRepositoryImpl<C>
                 "encryptionKey".to_string(),
                 vec!["auth".to_string(), "general".to_string()],
             )
-            .map_err(|_| CreateIdentifierError::JwkError)?;
-        let update: Jwk = keyring
-            .update
-            .get_public_key()
-            .try_into()
-            .map_err(|_| CreateIdentifierError::JwkError)?;
-        let recovery: Jwk = keyring
-            .recovery
-            .get_public_key()
-            .try_into()
-            .map_err(|_| CreateIdentifierError::JwkError)?;
+            .map_err(|_| CreateIdentifierError::Jwk)?;
+        let update: Jwk =
+            keyring.update.get_public_key().try_into().map_err(|_| CreateIdentifierError::Jwk)?;
+        let recovery: Jwk =
+            keyring.recovery.get_public_key().try_into().map_err(|_| CreateIdentifierError::Jwk)?;
         let document =
             DidReplacePayload { public_keys: vec![sign, enc], service_endpoints: vec![] };
         let payload = did_create_payload(document, &update, &recovery)?;
@@ -145,8 +139,7 @@ impl<C: SidetreeHttpClient + Send + Sync> DidRepository for DidRepositoryImpl<C>
             .await
             .map_err(CreateIdentifierError::SidetreeHttpClientError)?;
         if response.status_code.is_success() {
-            let response = serde_json::from_str(&response.body)?;
-            Ok(response)
+            Ok(serde_json::from_str(&response.body)?)
         } else {
             Err(CreateIdentifierError::SidetreeRequestFailed(format!("{:?}", response)))
         }
