@@ -20,11 +20,11 @@ pub enum CreateIdentifierError<StudioClientError: std::error::Error> {
     #[error("Failed to build operation payload: {0}")]
     PayloadBuildFailed(#[from] crate::did::sidetree::payload::DidCreatePayloadError),
     #[error("Failed to parse body: {0}")]
-    BodyParseError(#[from] serde_json::Error),
+    BodyParse(#[from] serde_json::Error),
     #[error("Failed to create identifier. response: {0}")]
     SidetreeRequestFailed(String),
     #[error("Failed to send request: {0}")]
-    SidetreeHttpClientError(StudioClientError),
+    SidetreeHttpClient(StudioClientError),
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -32,9 +32,9 @@ pub enum FindIdentifierError<StudioClientError: std::error::Error> {
     #[error("Failed to send request to sidetree: {0}")]
     SidetreeRequestFailed(String),
     #[error("Failed to parse body: {0}")]
-    BodyParseError(#[from] serde_json::Error),
+    BodyParse(#[from] serde_json::Error),
     #[error("Failed to send request: {0}")]
-    SidetreeHttpClientError(StudioClientError),
+    SidetreeHttpClient(StudioClientError),
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -42,9 +42,9 @@ pub enum GetPublicKeyError {
     #[error("Failed to get public key")]
     PublicKeyNotFound(String),
     #[error("Failed to convert from JWK: {0}")]
-    JwkToK256Error(#[from] crate::keyring::jwk::JwkToK256Error),
+    JwkToK256(#[from] crate::keyring::jwk::JwkToK256Error),
     #[error("Failed to convert from JWK: {0}")]
-    JwkToX25519Error(#[from] crate::keyring::jwk::JwkToX25519Error),
+    JwkToX25519(#[from] crate::keyring::jwk::JwkToX25519Error),
 }
 
 fn get_key(key_type: &str, did_document: &DidDocument) -> Result<Jwk, GetPublicKeyError> {
@@ -137,7 +137,7 @@ impl<C: SidetreeHttpClient + Send + Sync> DidRepository for DidRepositoryImpl<C>
             .client
             .post_create_identifier(&payload)
             .await
-            .map_err(CreateIdentifierError::SidetreeHttpClientError)?;
+            .map_err(CreateIdentifierError::SidetreeHttpClient)?;
         if response.status_code.is_success() {
             Ok(serde_json::from_str(&response.body)?)
         } else {
@@ -153,7 +153,7 @@ impl<C: SidetreeHttpClient + Send + Sync> DidRepository for DidRepositoryImpl<C>
             .client
             .get_find_identifier(did)
             .await
-            .map_err(FindIdentifierError::SidetreeHttpClientError)?;
+            .map_err(FindIdentifierError::SidetreeHttpClient)?;
 
         match response.status_code {
             StatusCode::OK => Ok(Some(serde_json::from_str(&response.body)?)),
