@@ -1,11 +1,11 @@
 use data_encoding::BASE64URL_NOPAD;
-use generic_array::GenericArray;
 use k256::ecdsa::{
     signature::{Signer, Verifier},
     Signature, SigningKey, VerifyingKey,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sha2::digest::generic_array::GenericArray;
 use thiserror::Error;
 
 // TODO: Design the interface to have an implementation with accelerators.
