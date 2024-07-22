@@ -33,7 +33,7 @@ pub enum DidVcServiceVerifyError<FindIdentifierError: std::error::Error> {
     PublicKeyNotFound(#[from] GetPublicKeyError),
     #[error("failed to get did document: {0}")]
     DidDocNotFound(String),
-    #[error("failed to find indentifier: {0}")]
+    #[error("failed to find identifier: {0}")]
     FindIdentifier(FindIdentifierError),
     #[error("credential signer error")]
     VerifyFailed(#[from] CredentialSignerVerifyError),
