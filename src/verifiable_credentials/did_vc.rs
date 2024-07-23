@@ -12,8 +12,8 @@ use crate::{
     },
 };
 
-#[async_trait::async_trait]
-pub trait DidVcService: Sync {
+#[trait_variant::make(DidVcService: Send)]
+pub trait LocalDidVcService: Sync {
     type GenerateError: std::error::Error;
     type VerifyError: std::error::Error;
     fn generate(
@@ -39,7 +39,6 @@ pub enum DidVcServiceVerifyError<FindIdentifierError: std::error::Error> {
     VerifyFailed(#[from] CredentialSignerVerifyError),
 }
 
-#[async_trait::async_trait]
 impl<R: DidRepository> DidVcService for R {
     type GenerateError = CredentialSignerSignError;
     type VerifyError = DidVcServiceVerifyError<R::FindIdentifierError>;
@@ -79,7 +78,7 @@ mod tests {
     use rand_core::OsRng;
     use serde_json::{json, Value};
 
-    use super::*;
+    use super::{DidVcService, DidVcServiceVerifyError, VerifiableCredentials};
     use crate::{
         did::{did_repository::mocks::MockDidRepository, test_utils::create_random_did},
         keyring::keypair::KeyPairing,

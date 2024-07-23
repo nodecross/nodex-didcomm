@@ -19,8 +19,8 @@ use crate::{
     },
 };
 
-#[async_trait::async_trait]
-pub trait DidCommEncryptedService: Sync {
+#[trait_variant::make(DidCommEncryptedService: Send)]
+pub trait LocalDidCommEncryptedService: Sync {
     type GenerateError: std::error::Error;
     type VerifyError: std::error::Error;
     async fn generate(
@@ -204,7 +204,6 @@ pub enum DidCommEncryptedServiceVerifyError<FindIdentifierError: std::error::Err
     FindSender(#[from] FindSenderError),
 }
 
-#[async_trait::async_trait]
 impl<R> DidCommEncryptedService for R
 where
     R: DidRepository + DidVcService,
@@ -248,7 +247,6 @@ where
     }
 }
 
-#[async_trait::async_trait]
 impl<R> DidCommEncryptedService for DidCommServiceWithAttachment<R>
 where
     R: DidRepository + DidVcService,
