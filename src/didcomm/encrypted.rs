@@ -19,10 +19,10 @@ use crate::{
     },
 };
 
-#[trait_variant::make(DidCommEncryptedService: Send)]
-pub trait LocalDidCommEncryptedService: Sync {
-    type GenerateError: std::error::Error;
-    type VerifyError: std::error::Error;
+#[trait_variant::make(Send)]
+pub trait DidCommEncryptedService: Sync {
+    type GenerateError: std::error::Error + Sync + Send;
+    type VerifyError: std::error::Error + Sync + Send;
     async fn generate(
         &self,
         model: VerifiableCredentials,
@@ -194,7 +194,7 @@ pub enum DidCommEncryptedServiceVerifyError<FindIdentifierError: std::error::Err
     SidetreeFindRequestFailed(FindIdentifierError),
     #[error("did public key not found. did: {0}")]
     DidPublicKeyNotFound(#[from] GetPublicKeyError),
-    #[error("failed to decrypt message: {0}")]
+    #[error("failed to decrypt message: {0:?}")]
     DecryptFailed(#[from] didcomm_rs::Error),
     #[error("failed to get body: {0:?}")]
     MetadataBodyNotFound(Option<didcomm_rs::Error>),

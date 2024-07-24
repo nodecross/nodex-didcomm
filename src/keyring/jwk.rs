@@ -35,7 +35,7 @@ pub enum JwkToK256Error {
 
 #[derive(Error, Debug)]
 pub enum JwkToX25519Error {
-    #[error("decode error")]
+    #[error("decode error: {0:?}")]
     Decode(Option<DecodeError>),
     #[error("different crv")]
     DifferentCrv,

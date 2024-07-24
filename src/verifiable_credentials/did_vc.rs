@@ -12,10 +12,10 @@ use crate::{
     },
 };
 
-#[trait_variant::make(DidVcService: Send)]
-pub trait LocalDidVcService: Sync {
-    type GenerateError: std::error::Error;
-    type VerifyError: std::error::Error;
+#[trait_variant::make(Send)]
+pub trait DidVcService: Sync {
+    type GenerateError: std::error::Error + Send + Sync;
+    type VerifyError: std::error::Error + Send + Sync;
     fn generate(
         &self,
         model: VerifiableCredentials,

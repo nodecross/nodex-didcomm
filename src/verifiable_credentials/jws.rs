@@ -28,7 +28,7 @@ pub enum JwsEncodeError {
 
 #[derive(Debug, Error)]
 pub enum JwsDecodeError {
-    #[error("DecodeError: {0}")]
+    #[error("DecodeError: {0:?}")]
     DecodeError(#[from] data_encoding::DecodeError),
     #[error(transparent)]
     JsonParseError(#[from] serde_json::Error),
@@ -44,7 +44,7 @@ pub enum JwsDecodeError {
     EmptyPayload,
     #[error("InvalidJws : {0}")]
     InvalidJws(String),
-    #[error("CryptError: {0}")]
+    #[error("CryptError: {0:?}")]
     CryptError(#[from] k256::ecdsa::Error),
     #[error("FromUtf8Error: {0}")]
     FromUtf8Error(#[from] std::string::FromUtf8Error),

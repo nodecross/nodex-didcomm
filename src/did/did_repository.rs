@@ -15,8 +15,8 @@ use crate::keyring::{
 
 #[derive(Debug, thiserror::Error)]
 pub enum CreateIdentifierError<StudioClientError: std::error::Error> {
-    #[error("Failed to convert to JWK")]
-    Jwk,
+    #[error("Failed to convert to JWK: {0}")]
+    Jwk(#[from] crate::keyring::jwk::K256ToJwkError),
     #[error("Failed to build operation payload: {0}")]
     PayloadBuildFailed(#[from] crate::did::sidetree::payload::DidCreatePayloadError),
     #[error("Failed to parse body: {0}")]
@@ -39,7 +39,7 @@ pub enum FindIdentifierError<StudioClientError: std::error::Error> {
 
 #[derive(Debug, thiserror::Error)]
 pub enum GetPublicKeyError {
-    #[error("Failed to get public key")]
+    #[error("Failed to get public key: {0}")]
     PublicKeyNotFound(String),
     #[error("Failed to convert from JWK: {0}")]
     JwkToK256(#[from] crate::keyring::jwk::JwkToK256Error),
@@ -69,8 +69,8 @@ pub fn get_encrypt_key(
     Ok(public_key.try_into()?)
 }
 
-#[trait_variant::make(DidRepository: Send)]
-pub trait LocalDidRepository: Sync {
+#[trait_variant::make(Send)]
+pub trait DidRepository: Sync {
     type CreateIdentifierError: std::error::Error + Send + Sync;
     type FindIdentifierError: std::error::Error + Send + Sync;
     async fn create_identifier(
@@ -105,15 +105,11 @@ impl<C: SidetreeHttpClient + Send + Sync> DidRepository for DidRepositoryImpl<C>
         // TODO: This purpose property is strange...
         // https://identity.foundation/sidetree/spec/#add-public-keys
         // vec!["assertionMethod".to_string()],
-        let sign = keyring
-            .sign
-            .get_public_key()
-            .to_public_key(
-                "EcdsaSecp256k1VerificationKey2019".to_string(),
-                "signingKey".to_string(),
-                vec!["auth".to_string(), "general".to_string()],
-            )
-            .map_err(|_| CreateIdentifierError::Jwk)?;
+        let sign = keyring.sign.get_public_key().to_public_key(
+            "EcdsaSecp256k1VerificationKey2019".to_string(),
+            "signingKey".to_string(),
+            vec!["auth".to_string(), "general".to_string()],
+        )?;
         // vec!["keyAgreement".to_string()]
         let enc = keyring
             .encrypt
@@ -123,11 +119,9 @@ impl<C: SidetreeHttpClient + Send + Sync> DidRepository for DidRepositoryImpl<C>
                 "encryptionKey".to_string(),
                 vec!["auth".to_string(), "general".to_string()],
             )
-            .map_err(|_| CreateIdentifierError::Jwk)?;
-        let update: Jwk =
-            keyring.update.get_public_key().try_into().map_err(|_| CreateIdentifierError::Jwk)?;
-        let recovery: Jwk =
-            keyring.recovery.get_public_key().try_into().map_err(|_| CreateIdentifierError::Jwk)?;
+            .unwrap();
+        let update: Jwk = keyring.update.get_public_key().try_into()?;
+        let recovery: Jwk = keyring.recovery.get_public_key().try_into()?;
         let document =
             DidReplacePayload { public_keys: vec![sign, enc], service_endpoints: vec![] };
         let payload = did_create_payload(document, &update, &recovery)?;
