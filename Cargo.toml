@@ -1,6 +1,6 @@
 [package]
 categories = ["cryptography", "embedded"]
-edition = "2018"
+edition = "2021"
 keywords = ["did", "embedded", "iot", "root-of-trust"]
 name = "nodex-didcomm"
 readme = "README.md"
