@@ -15,7 +15,7 @@ pub fn hash(message: &[u8]) -> Vec<u8> {
 }
 
 pub fn double_hash_encode(message: &[u8]) -> String {
-    let mes = hash(message);
+    let mes = Sha256::digest(message).to_vec();
     let mes = hash(&mes);
     BASE64URL_NOPAD.encode(&mes)
 }

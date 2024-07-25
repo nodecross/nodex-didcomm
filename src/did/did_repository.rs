@@ -5,7 +5,7 @@ use http::StatusCode;
 use super::sidetree::{
     client::SidetreeHttpClient,
     payload::{
-        did_create_payload, DidDocument, DidReplacePayload, DidResolutionResponse, ToPublicKey,
+        did_create_payload, DidDocument, DidPatchDocument, DidResolutionResponse, ToPublicKey,
     },
 };
 use crate::keyring::{
@@ -120,11 +120,10 @@ impl<C: SidetreeHttpClient + Send + Sync> DidRepository for DidRepositoryImpl<C>
                 vec!["auth".to_string(), "general".to_string()],
             )
             .unwrap();
-        let update: Jwk = keyring.update.get_public_key().try_into()?;
-        let recovery: Jwk = keyring.recovery.get_public_key().try_into()?;
-        let document =
-            DidReplacePayload { public_keys: vec![sign, enc], service_endpoints: vec![] };
-        let payload = did_create_payload(document, &update, &recovery)?;
+        let update = keyring.update.get_public_key();
+        let recovery = keyring.recovery.get_public_key();
+        let document = DidPatchDocument { public_keys: vec![sign, enc], service_endpoints: vec![] };
+        let payload = did_create_payload(document, update, recovery)?;
 
         let response = self
             .client

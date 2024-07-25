@@ -12,7 +12,7 @@ use thiserror::Error;
 // TODO: Design the interface to have an implementation with accelerators.
 
 #[derive(Debug, Serialize, Deserialize)]
-struct JWSHeader {
+struct JwsHeader {
     alg: String,
     b64: bool,
     crit: Vec<String>,
@@ -52,7 +52,7 @@ pub enum JwsDecodeError {
 
 pub fn sign(object: &Value, secret_key: &k256::SecretKey) -> Result<String, JwsEncodeError> {
     // NOTE: header
-    let header = JWSHeader { alg: "ES256K".to_string(), b64: false, crit: vec!["b64".to_string()] };
+    let header = JwsHeader { alg: "ES256K".to_string(), b64: false, crit: vec!["b64".to_string()] };
     let header = serde_jcs::to_string(&header)?;
     let header = BASE64URL_NOPAD.encode(header.as_bytes());
     // NOTE: payload
@@ -87,7 +87,7 @@ pub fn verify(
     // NOTE: header
     let decoded = BASE64URL_NOPAD.decode(_header.as_bytes())?;
     let decoded = String::from_utf8(decoded)?;
-    let header = serde_json::from_str::<JWSHeader>(&decoded)?;
+    let header = serde_json::from_str::<JwsHeader>(&decoded)?;
 
     if header.alg != *"ES256K" {
         return Err(JwsDecodeError::InvalidAlgorithm(header.alg));
