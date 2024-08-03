@@ -94,7 +94,11 @@ impl<C: SidetreeHttpClient> DidRepositoryImpl<C> {
     }
 }
 
-impl<C: SidetreeHttpClient + Send + Sync> DidRepository for DidRepositoryImpl<C> {
+impl<C> DidRepository for DidRepositoryImpl<C>
+where
+    C: SidetreeHttpClient + Send + Sync,
+    C::Error: Send + Sync,
+{
     type CreateIdentifierError = CreateIdentifierError<C::Error>;
     type FindIdentifierError = FindIdentifierError<C::Error>;
     async fn create_identifier(
@@ -102,7 +106,8 @@ impl<C: SidetreeHttpClient + Send + Sync> DidRepository for DidRepositoryImpl<C>
         keyring: KeyPairing,
     ) -> Result<DidResolutionResponse, CreateIdentifierError<C::Error>> {
         // https://w3c.github.io/did-spec-registries/#assertionmethod
-        // TODO: This purpose property is strange...
+        // FIXME: This purpose property is strange...
+        //        I guess the sidetree protocol this impl uses is too old.
         // https://identity.foundation/sidetree/spec/#add-public-keys
         // vec!["assertionMethod".to_string()],
         let sign = keyring.sign.get_public_key().to_public_key(

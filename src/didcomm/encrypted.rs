@@ -21,8 +21,8 @@ use crate::{
 
 #[trait_variant::make(Send)]
 pub trait DidCommEncryptedService: Sync {
-    type GenerateError: std::error::Error + Sync + Send;
-    type VerifyError: std::error::Error + Sync + Send;
+    type GenerateError: std::error::Error;
+    type VerifyError: std::error::Error;
     async fn generate(
         &self,
         model: VerifiableCredentials,
