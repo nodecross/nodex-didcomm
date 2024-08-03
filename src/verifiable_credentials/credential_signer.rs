@@ -1,41 +1,32 @@
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
 use serde_json::json;
 use thiserror::Error;
 
 use super::types::Proof;
 use crate::{
-    common::{cipher::jws::Jws, utils},
-    keyring::secp256k1::Secp256k1,
-    verifiable_credentials::types::VerifiableCredentials,
+    keyring::keypair::{K256KeyPair, KeyPair},
+    verifiable_credentials::{jws, types::VerifiableCredentials},
 };
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ProofContext {
-    #[serde(rename = "proof")]
-    pub proof: Option<Proof>,
-}
 
 pub struct CredentialSignerSuite<'a> {
     pub did: &'a str,
     pub key_id: &'a str,
-    pub context: &'a Secp256k1,
+    pub context: &'a K256KeyPair,
 }
 
 #[derive(Debug, Error)]
 pub enum CredentialSignerSignError {
     #[error("jws error: {0:?}")]
-    JwsError(#[from] crate::common::cipher::jws::JwsEncodeError),
+    Jws(#[from] jws::JwsEncodeError),
     #[error("json parse error: {0:?}")]
-    JsonParseError(#[from] serde_json::Error),
+    Json(#[from] serde_json::Error),
 }
 
 #[derive(Debug, Error)]
 pub enum CredentialSignerVerifyError {
     #[error("jws error: {0:?}")]
-    JwsError(#[from] crate::common::cipher::jws::JwsDecodeError),
+    Jws(#[from] jws::JwsDecodeError),
     #[error("json parse error: {0:?}")]
-    JsonParseError(#[from] serde_json::Error),
+    Json(#[from] serde_json::Error),
     #[error("proof not found")]
     ProofNotFound,
 }
@@ -44,59 +35,45 @@ pub struct CredentialSigner {}
 
 impl CredentialSigner {
     pub fn sign(
-        object: &VerifiableCredentials,
+        mut object: VerifiableCredentials,
         suite: CredentialSignerSuite,
-        created: DateTime<Utc>,
     ) -> Result<VerifiableCredentials, CredentialSignerSignError> {
-        let jws = Jws::encode(&json!(object), suite.context)?;
-
+        let jws = jws::sign(&json!(object), &suite.context.get_secret_key())?;
         let did = suite.did;
         let key_id = suite.key_id;
-
-        let proof: ProofContext = ProofContext {
-            proof: Some(Proof {
-                r#type: "EcdsaSecp256k1Signature2019".to_string(),
-                proof_purpose: "authentication".to_string(),
-                created: created.to_rfc3339(),
-                verification_method: format!("{}#{}", did, key_id),
-                jws,
-                domain: None,
-                controller: None,
-                challenge: None,
-            }),
-        };
-
-        // NOTE: sign
-        let mut signed_object = json!(object);
-
-        utils::json::merge(&mut signed_object, json!(proof));
-
-        Ok(serde_json::from_value::<VerifiableCredentials>(signed_object)?)
+        object.proof = Some(Proof {
+            r#type: "EcdsaSecp256k1Signature2019".to_string(),
+            proof_purpose: "authentication".to_string(),
+            // Assume that object.issuance_date is correct data
+            created: object.issuance_date,
+            verification_method: format!("{}#{}", did, key_id),
+            jws,
+            domain: None,
+            controller: None,
+            challenge: None,
+        });
+        Ok(object)
     }
 
     pub fn verify(
         mut object: VerifiableCredentials,
-        context: &Secp256k1,
-    ) -> Result<(VerifiableCredentials, bool), CredentialSignerVerifyError> {
+        public_key: &k256::PublicKey,
+    ) -> Result<VerifiableCredentials, CredentialSignerVerifyError> {
         let proof = object.proof.take().ok_or(CredentialSignerVerifyError::ProofNotFound)?;
-
         let jws = proof.jws;
         let payload = serde_json::to_value(&object)?;
-
-        let verified = Jws::verify(&payload, &jws, context)?;
-
-        Ok((object, verified))
+        jws::verify(&payload, &jws, public_key)?;
+        Ok(object)
     }
 }
 
 #[cfg(test)]
 pub mod tests {
 
+    use chrono::{DateTime, Utc};
+
     use super::*;
-    use crate::{
-        keyring::{self},
-        verifiable_credentials::types::{CredentialSubject, Issuer},
-    };
+    use crate::verifiable_credentials::types::{CredentialSubject, Issuer};
 
     const PRIVATE_KEY: [u8; 32] = [
         0xc7, 0x39, 0x80, 0x5a, 0xb0, 0x3d, 0xa6, 0x2d, 0xdb, 0xe0, 0x33, 0x90, 0xac, 0xdf, 0x76,
@@ -111,16 +88,28 @@ pub mod tests {
     ];
 
     #[test]
+    pub fn test_public_key() {
+        let sk = k256::SecretKey::from_slice(&PRIVATE_KEY).unwrap();
+        let context = K256KeyPair::new(sk);
+        assert_eq!(
+            context.get_public_key(),
+            k256::PublicKey::from_sec1_bytes(&PUBLIC_KEY).unwrap()
+        );
+    }
+
+    #[test]
     pub fn test_sign() {
-        let context =
-            keyring::secp256k1::Secp256k1::new(PUBLIC_KEY.to_vec(), PRIVATE_KEY.to_vec()).unwrap();
+        let sk = k256::SecretKey::from_slice(&PRIVATE_KEY).unwrap();
+        let context = K256KeyPair::new(sk);
 
         let model = VerifiableCredentials {
             id: None,
             r#type: vec!["type".to_string()],
             issuer: Issuer { id: "issuer".to_string() },
             context: vec!["context".to_string()],
-            issuance_date: "issuance_date".to_string(),
+            issuance_date: DateTime::parse_from_rfc3339("2024-07-19T06:06:51.361316372Z")
+                .unwrap()
+                .to_utc(),
             credential_subject: CredentialSubject {
                 id: None,
                 container: json!(r#"{"k":"0123456789abcdef"}"#),
@@ -130,13 +119,12 @@ pub mod tests {
         };
 
         let result = CredentialSigner::sign(
-            &model,
+            model,
             CredentialSignerSuite {
                 did: "did:nodex:test:000000000000000000000000000000",
                 key_id: "signingKey",
                 context: &context,
             },
-            Utc::now(),
         )
         .unwrap();
 
@@ -144,7 +132,7 @@ pub mod tests {
             Some(proof) => {
                 assert_eq!(
                     proof.jws,
-                    "eyJhbGciOiJFUzI1NksiLCJiNjQiOmZhbHNlLCJjcml0IjpbImI2NCJdfQ..Qc-NyzQu2v735_qPR72j1oqUDK1Ne4XQ7Lc66_x9tlMSeI9xmrgguEA8UmQyTM0cd13xkvpK4g-NEWJBp8_d_w"
+                    "eyJhbGciOiJFUzI1NksiLCJiNjQiOmZhbHNlLCJjcml0IjpbImI2NCJdfQ..LK8OcOuMgWU4Y5Zpz9jeQ8b5UsgDmjKJTBpuxFepGlp-hGVHVgyZz8QkZseqQRdUXn6JouVYo1jFsQCq_7p7ig"
                 );
                 assert_eq!(proof.proof_purpose, "authentication");
                 assert_eq!(proof.r#type, "EcdsaSecp256k1Signature2019");
@@ -159,15 +147,15 @@ pub mod tests {
 
     #[test]
     pub fn test_verify() {
-        let context =
-            keyring::secp256k1::Secp256k1::new(PUBLIC_KEY.to_vec(), PRIVATE_KEY.to_vec()).unwrap();
+        let sk = k256::SecretKey::from_slice(&PRIVATE_KEY).unwrap();
+        let context = K256KeyPair::new(sk);
 
         let model = VerifiableCredentials {
             id: None,
             r#type: vec!["type".to_string()],
             issuer: Issuer { id: "issuer".to_string() },
             context: vec!["context".to_string()],
-            issuance_date: "issuance_date".to_string(),
+            issuance_date: Utc::now(),
             credential_subject: CredentialSubject {
                 id: None,
                 container: json!(r#"{"k":"0123456789abcdef"}"#),
@@ -177,19 +165,17 @@ pub mod tests {
         };
 
         let vc = CredentialSigner::sign(
-            &model,
+            model.clone(),
             CredentialSignerSuite {
                 did: "did:nodex:test:000000000000000000000000000000",
                 key_id: "signingKey",
                 context: &context,
             },
-            Utc::now(),
         )
         .unwrap();
 
-        let (verified_model, verified) = CredentialSigner::verify(vc, &context).unwrap();
+        let verified_model = CredentialSigner::verify(vc, &context.get_public_key()).unwrap();
 
-        assert!(verified);
         assert_eq!(model, verified_model);
     }
 }

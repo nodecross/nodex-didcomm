@@ -1,126 +1,72 @@
-use anyhow::Context as _;
-use chrono::{DateTime, Utc};
-use serde_json::Value;
 use thiserror::Error;
 
 use crate::{
-    did::did_repository::{DidRepository, FindIdentifierError},
-    keyring::{self, keypair},
+    did::did_repository::{get_sign_key, DidRepository, GetPublicKeyError},
+    keyring::keypair,
     verifiable_credentials::{
         credential_signer::{
             CredentialSigner, CredentialSignerSignError, CredentialSignerSuite,
             CredentialSignerVerifyError,
         },
-        types::{CredentialSubject, Issuer, VerifiableCredentials},
+        types::VerifiableCredentials,
     },
 };
 
-pub struct DIDVCService<R: DidRepository> {
-    pub(crate) did_repository: R,
-}
-
-impl<R: DidRepository> DIDVCService<R> {
-    pub fn new(did_repository: R) -> Self {
-        Self { did_repository }
-    }
-}
-
-impl<R: DidRepository + Clone> Clone for DIDVCService<R> {
-    fn clone(&self) -> Self {
-        Self { did_repository: self.did_repository.clone() }
-    }
-}
-
-#[derive(Debug, Error)]
-pub enum DIDVCServiceGenerateError {
-    #[error("credential signer error")]
-    SignFailed(#[from] CredentialSignerSignError),
-}
-
-#[derive(Debug, Error)]
-pub enum DIDVCServiceVerifyError {
-    #[error("did not found : {0}")]
-    DIDNotFound(String),
-    #[error("did public key not found. did: {0}")]
-    PublicKeyNotFound(String),
-    #[error("credential signer error")]
-    VerifyFailed(#[from] CredentialSignerVerifyError),
-    #[error("public_keys length must be 1")]
-    PublicKeyLengthMismatch,
-    #[error("sidetree find request failed")]
-    SidetreeFindRequestFailed(#[from] FindIdentifierError),
-    #[error("signature is not verified")]
-    SignatureNotVerified,
-    #[error(transparent)]
-    Other(#[from] anyhow::Error),
-}
-
-impl<R: DidRepository> DIDVCService<R> {
-    pub fn generate(
-        &self,
-        from_did: &str,
-        from_keyring: &keypair::KeyPairing,
-        message: &Value,
-        issuance_date: DateTime<Utc>,
-    ) -> Result<VerifiableCredentials, DIDVCServiceGenerateError> {
-        let r#type = "VerifiableCredential".to_string();
-        let context = "https://www.w3.org/2018/credentials/v1".to_string();
-
-        let model = VerifiableCredentials {
-            id: None,
-            issuer: Issuer { id: from_did.to_string() },
-            r#type: vec![r#type],
-            context: vec![context],
-            issuance_date: issuance_date.to_rfc3339(),
-            credential_subject: CredentialSubject { id: None, container: message.clone() },
-            expiration_date: None,
-            proof: None,
-        };
-
-        let signed: VerifiableCredentials = CredentialSigner::sign(
-            &model,
-            CredentialSignerSuite {
-                did: from_did,
-                key_id: "signingKey",
-                context: &from_keyring.sign,
-            },
-            issuance_date,
-        )?;
-
-        Ok(signed)
-    }
-
-    pub async fn verify(
+#[trait_variant::make(Send)]
+pub trait DidVcService: Sync {
+    type GenerateError: std::error::Error + Send + Sync;
+    type VerifyError: std::error::Error + Send + Sync;
+    fn generate(
         &self,
         model: VerifiableCredentials,
-    ) -> Result<VerifiableCredentials, DIDVCServiceVerifyError> {
+        from_keyring: &keypair::KeyPairing,
+    ) -> Result<VerifiableCredentials, Self::GenerateError>;
+    async fn verify(
+        &self,
+        model: VerifiableCredentials,
+    ) -> Result<VerifiableCredentials, Self::VerifyError>;
+}
+
+#[derive(Debug, Error)]
+pub enum DidVcServiceVerifyError<FindIdentifierError: std::error::Error> {
+    #[error("did public key not found. did: {0}")]
+    PublicKeyNotFound(#[from] GetPublicKeyError),
+    #[error("failed to get did document: {0}")]
+    DidDocNotFound(String),
+    #[error("failed to find identifier: {0}")]
+    FindIdentifier(FindIdentifierError),
+    #[error("credential signer error")]
+    VerifyFailed(#[from] CredentialSignerVerifyError),
+}
+
+impl<R: DidRepository> DidVcService for R {
+    type GenerateError = CredentialSignerSignError;
+    type VerifyError = DidVcServiceVerifyError<R::FindIdentifierError>;
+    fn generate(
+        &self,
+        model: VerifiableCredentials,
+        from_keyring: &keypair::KeyPairing,
+    ) -> Result<VerifiableCredentials, Self::GenerateError> {
+        let did = &model.issuer.id.clone();
+        CredentialSigner::sign(
+            model,
+            CredentialSignerSuite { did, key_id: "signingKey", context: &from_keyring.sign },
+        )
+    }
+
+    async fn verify(
+        &self,
+        model: VerifiableCredentials,
+    ) -> Result<VerifiableCredentials, Self::VerifyError> {
         let did_document = self
-            .did_repository
             .find_identifier(&model.issuer.id)
-            .await?
-            .ok_or_else(|| DIDVCServiceVerifyError::DIDNotFound(model.issuer.id.clone()))?;
-        let public_keys = did_document
-            .did_document
-            .public_key
-            .ok_or_else(|| DIDVCServiceVerifyError::PublicKeyNotFound(model.issuer.id.clone()))?;
-
-        // FIXME: workaround
-        if public_keys.len() != 1 {
-            return Err(DIDVCServiceVerifyError::PublicKeyLengthMismatch);
-        }
-
-        let public_key = public_keys[0].clone();
-
-        let context = keyring::secp256k1::Secp256k1::from_jwk(&public_key.public_key_jwk)
-            .context("failed to convert key")?;
-
-        let (verified_model, verified) = CredentialSigner::verify(model, &context)?;
-
-        if verified {
-            Ok(verified_model)
-        } else {
-            Err(DIDVCServiceVerifyError::SignatureNotVerified)
-        }
+            .await
+            .map_err(Self::VerifyError::FindIdentifier)?;
+        let did_document = did_document
+            .ok_or(DidVcServiceVerifyError::DidDocNotFound(model.issuer.id.clone()))?
+            .did_document;
+        let public_key = get_sign_key(&did_document)?;
+        Ok(CredentialSigner::verify(model, &public_key)?)
     }
 }
 
@@ -128,32 +74,34 @@ impl<R: DidRepository> DIDVCService<R> {
 mod tests {
     use std::{collections::BTreeMap, iter::FromIterator as _};
 
-    use serde_json::json;
+    use chrono::{DateTime, Utc};
+    use rand_core::OsRng;
+    use serde_json::{json, Value};
 
-    use super::*;
+    use super::{DidVcService, DidVcServiceVerifyError, VerifiableCredentials};
     use crate::{
         did::{did_repository::mocks::MockDidRepository, test_utils::create_random_did},
-        keyring::{extension::trng::OSRandomNumberGenerator, keypair::KeyPairing},
+        keyring::keypair::KeyPairing,
     };
 
     #[actix_rt::test]
     async fn test_generate_and_verify() {
         let from_did = create_random_did();
 
-        let trng = OSRandomNumberGenerator::default();
-        let from_keyring = KeyPairing::create_keyring(&trng).unwrap();
+        let from_keyring = KeyPairing::create_keyring(OsRng);
 
         let mock_repository = MockDidRepository::from_single(BTreeMap::from_iter([(
             from_did.clone(),
             from_keyring.clone(),
         )]));
 
-        let service = DIDVCService::new(mock_repository);
+        let service = mock_repository;
 
         let message = json!({"test": "0123456789abcdef"});
         let issuance_date = Utc::now();
 
-        let res = service.generate(&from_did, &from_keyring, &message, issuance_date).unwrap();
+        let model = VerifiableCredentials::new(from_did.clone(), message.clone(), issuance_date);
+        let res = service.generate(model, &from_keyring).unwrap();
 
         let verified = service.verify(res).await.unwrap();
 
@@ -161,35 +109,7 @@ mod tests {
         assert_eq!(verified.credential_subject.container, message);
     }
 
-    mod generate_failed {
-        use super::*;
-        use crate::keyring::secp256k1::Secp256k1;
-
-        #[actix_rt::test]
-        async fn test_generate_sign_failed() {
-            let from_did = create_random_did();
-
-            let trng = OSRandomNumberGenerator::default();
-            let mut illegal_keyring = KeyPairing::create_keyring(&trng).unwrap();
-            illegal_keyring.sign = Secp256k1::new(
-                illegal_keyring.sign.get_public_key(),
-                vec![0; illegal_keyring.sign.get_secret_key().len()],
-            )
-            .unwrap();
-
-            let mock_repository = MockDidRepository::from_single(BTreeMap::new());
-
-            let service = DIDVCService::new(mock_repository);
-
-            let message = json!({"test": "0123456789abcdef"});
-            let issuance_date = Utc::now();
-
-            let res =
-                service.generate(&from_did, &illegal_keyring, &message, issuance_date).unwrap_err();
-
-            assert!(matches!(res, DIDVCServiceGenerateError::SignFailed(_)));
-        }
-    }
+    mod generate_failed {}
 
     mod verify_failed {
         use super::*;
@@ -203,9 +123,10 @@ mod tests {
             message: &Value,
             issuance_date: DateTime<Utc>,
         ) -> VerifiableCredentials {
-            let service = DIDVCService::new(MockDidRepository::from_single(BTreeMap::new()));
-
-            service.generate(from_did, from_keyring, message, issuance_date).unwrap()
+            let service = MockDidRepository::from_single(BTreeMap::new());
+            let model =
+                VerifiableCredentials::new(from_did.to_string(), message.clone(), issuance_date);
+            service.generate(model, from_keyring).unwrap()
         }
 
         #[actix_rt::test]
@@ -214,18 +135,18 @@ mod tests {
 
             let mock_repository = MockDidRepository::from_single(BTreeMap::new());
 
-            let service = DIDVCService::new(mock_repository);
+            let service = mock_repository;
 
             let model = create_did_vc(
                 &from_did,
-                &KeyPairing::create_keyring(&OSRandomNumberGenerator::default()).unwrap(),
+                &KeyPairing::create_keyring(OsRng),
                 &json!({}),
                 Utc::now(),
             );
 
             let res = service.verify(model).await.unwrap_err();
 
-            if let DIDVCServiceVerifyError::DIDNotFound(_) = res {
+            if let DidVcServiceVerifyError::DidDocNotFound(_) = res {
             } else {
                 panic!("unexpected error: {:?}", res);
             }
@@ -237,17 +158,17 @@ mod tests {
 
             let model = create_did_vc(
                 &from_did,
-                &KeyPairing::create_keyring(&OSRandomNumberGenerator::default()).unwrap(),
+                &KeyPairing::create_keyring(OsRng),
                 &json!({}),
                 Utc::now(),
             );
 
             let mock_repository = NoPublicKeyDidRepository;
-            let service = DIDVCService::new(mock_repository);
+            let service = mock_repository;
 
             let res = service.verify(model).await.unwrap_err();
 
-            if let DIDVCServiceVerifyError::PublicKeyNotFound(_) = res {
+            if let DidVcServiceVerifyError::PublicKeyNotFound(_) = res {
             } else {
                 panic!("unexpected error: {:?}", res);
             }
@@ -259,7 +180,7 @@ mod tests {
 
             let mut model = create_did_vc(
                 &from_did,
-                &KeyPairing::create_keyring(&OSRandomNumberGenerator::default()).unwrap(),
+                &KeyPairing::create_keyring(OsRng),
                 &json!({}),
                 Utc::now(),
             );
@@ -268,13 +189,13 @@ mod tests {
 
             let mock_repository = MockDidRepository::from_single(BTreeMap::from_iter([(
                 from_did.clone(),
-                KeyPairing::create_keyring(&OSRandomNumberGenerator::default()).unwrap(),
+                KeyPairing::create_keyring(OsRng),
             )]));
-            let service = DIDVCService::new(mock_repository);
+            let service = mock_repository;
 
             let res = service.verify(model).await.unwrap_err();
 
-            if let DIDVCServiceVerifyError::VerifyFailed(_) = res {
+            if let DidVcServiceVerifyError::VerifyFailed(_) = res {
             } else {
                 panic!("unexpected error: {:?}", res);
             }
@@ -286,17 +207,17 @@ mod tests {
 
             let model = create_did_vc(
                 &from_did,
-                &KeyPairing::create_keyring(&OSRandomNumberGenerator::default()).unwrap(),
+                &KeyPairing::create_keyring(OsRng),
                 &json!({}),
                 Utc::now(),
             );
 
             let mock_repository = IllegalPublicKeyLengthDidRepository;
-            let service = DIDVCService::new(mock_repository);
+            let service = mock_repository;
 
             let res = service.verify(model).await.unwrap_err();
 
-            if let DIDVCServiceVerifyError::PublicKeyLengthMismatch = res {
+            if let DidVcServiceVerifyError::PublicKeyNotFound(_) = res {
             } else {
                 panic!("unexpected error: {:?}", res);
             }
@@ -308,20 +229,20 @@ mod tests {
 
             let model = create_did_vc(
                 &from_did,
-                &KeyPairing::create_keyring(&OSRandomNumberGenerator::default()).unwrap(),
+                &KeyPairing::create_keyring(OsRng),
                 &json!({}),
                 Utc::now(),
             );
 
             let mock_repository = MockDidRepository::from_single(BTreeMap::from_iter([(
                 from_did.clone(),
-                KeyPairing::create_keyring(&OSRandomNumberGenerator::default()).unwrap(),
+                KeyPairing::create_keyring(OsRng),
             )]));
-            let service = DIDVCService::new(mock_repository);
+            let service = mock_repository;
 
             let res = service.verify(model).await.unwrap_err();
 
-            if let DIDVCServiceVerifyError::SignatureNotVerified = res {
+            if let DidVcServiceVerifyError::VerifyFailed(_) = res {
             } else {
                 panic!("unexpected error: {:?}", res);
             }

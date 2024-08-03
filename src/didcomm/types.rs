@@ -1,10 +1,9 @@
-use anyhow::Context as _;
+use data_encoding::BASE64URL_NOPAD;
 use serde::{Deserialize, Serialize};
-
-use crate::common::runtime::base64_url::{self, PaddingType};
+use thiserror::Error;
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
-pub struct DIDCommMessage {
+pub struct DidCommMessage {
     pub ciphertext: String,
     pub iv: String,
     pub protected: String,
@@ -35,26 +34,35 @@ pub struct Epk {
     pub x: String,
 }
 
-impl DIDCommMessage {
-    pub fn find_receivers(&self) -> anyhow::Result<Vec<String>> {
-        let to_dids = self.recipients.iter().map(|v| v.header.kid.clone()).collect();
+#[derive(Debug, Error)]
+pub enum FindSenderError {
+    #[error("failed serialize/deserialize: {0}")]
+    Json(#[from] serde_json::Error),
+    #[error("failed to base64 decode protected: {0}")]
+    FromUtf8(#[from] std::string::FromUtf8Error),
+    #[error("failed to base64 decode protected: {0}")]
+    Decode(#[from] data_encoding::DecodeError),
+    #[error("skid error")]
+    Skid,
+}
 
-        Ok(to_dids)
+impl DidCommMessage {
+    pub fn find_receivers(&self) -> Vec<String> {
+        self.recipients.iter().map(|v| v.header.kid.clone()).collect()
     }
 
-    pub fn find_sender(&self) -> anyhow::Result<String> {
+    pub fn find_sender(&self) -> Result<String, FindSenderError> {
         let protected = &self.protected;
 
-        let decoded = base64_url::Base64Url::decode_as_string(protected, &PaddingType::NoPadding)
-            .context("failed to base64 decode protected")?;
-        let decoded = serde_json::from_str::<serde_json::Value>(&decoded)
-            .context("failed to decode to json")?;
+        let decoded = BASE64URL_NOPAD.decode(protected.as_bytes())?;
+        let decoded = String::from_utf8(decoded)?;
+        let decoded = serde_json::from_str::<serde_json::Value>(&decoded)?;
 
         let from_did = decoded
             .get("skid")
-            .context("skid not found")?
+            .ok_or(FindSenderError::Skid)?
             .as_str()
-            .context("failed to serialize skid")?
+            .ok_or(FindSenderError::Skid)?
             .to_string();
 
         Ok(from_did)
@@ -72,7 +80,7 @@ mod tests {
 
     #[test]
     fn extract_from_did() {
-        let message: DIDCommMessage = serde_json::from_str(MESSAGE).unwrap();
+        let message: DidCommMessage = serde_json::from_str(MESSAGE).unwrap();
         let result = message.find_sender().unwrap();
         assert_eq!(&result, FROM_DID);
     }
@@ -80,15 +88,15 @@ mod tests {
     #[test]
     fn extract_from_did_when_invalid_base64() {
         let message = include_str!("../../test_resources/invalid_didcomm_message.json");
-        let message: DIDCommMessage = serde_json::from_str(message).unwrap();
+        let message: DidCommMessage = serde_json::from_str(message).unwrap();
         let result = message.find_sender();
         assert!(result.is_err());
     }
 
     #[test]
     fn extract_to_did() {
-        let message: DIDCommMessage = serde_json::from_str(MESSAGE).unwrap();
-        let result = message.find_receivers().unwrap();
+        let message: DidCommMessage = serde_json::from_str(MESSAGE).unwrap();
+        let result = message.find_receivers();
         let expected_did = vec![TO_DID.to_string()];
         assert_eq!(result, expected_did);
     }
