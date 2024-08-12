@@ -24,7 +24,7 @@ k256 = { version = "0.13.3", features = [
 rand_core = "0.6.4"
 serde = { version = "1.0.204", features = ["derive"] }
 serde_jcs = "0.1.0"
-serde_json = "1.0.120"
+serde_json = "1.0.124"
 sha2 = "0.10.8"
 thiserror = "1.0.63"
 trait-variant = "0.1.2"
