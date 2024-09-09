@@ -72,7 +72,7 @@ jobs:
 
       - name: Create PR
         id: create-pr
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v7
         with:
           commit-message: "chore: bump version to v${{ steps.set_crate_version.outputs.version }}"
           branch: "chore/bump-version-to-v${{ steps.set_crate_version.outputs.version }}"
