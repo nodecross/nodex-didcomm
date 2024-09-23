@@ -15,7 +15,7 @@ data-encoding = "2.6.0"
 didcomm-rs = { git = "https://github.com/nodecross/didcomm-rs.git", tag = "v0.8.1", default-features = false, features = ["raw-crypto"] }
 hex = "0.4.3"
 http = "1.1.0"
-k256 = { version = "0.13.3", features = [
+k256 = { version = "0.13.4", features = [
     "ecdh",
     "ecdsa",
     "serde",
